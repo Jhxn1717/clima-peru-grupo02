@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-950 text-slate-100 antialiased selection:bg-sky-500 selection:text-white;
+  }
+}
+
+/* Glassmorphism and Custom Styles */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-card {
+  background: rgba(30, 41, 59, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glass-card-hover {
+  @apply transition-all duration-300 hover:border-sky-500/40 hover:shadow-lg hover:shadow-sky-500/10 hover:-translate-y-0.5;
+}
+
+/* Gradient Texts */
+.gradient-text-sky {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-sky-400 via-cyan-300 to-blue-500;
+}
+
+.gradient-text-peru {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-red-500 via-rose-400 to-amber-400;
+}
+
+/* Custom Scrollbar for horizontal hourly forecast */
+::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.3);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 189, 248, 0.6);
+}
+
+/* Leaflet Map Custom dark theme styling */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  border-radius: 0.75rem;
+  background-color: #0b0f19 !important;
+  font-family: inherit;
+}
+
+.leaflet-popup-content-wrapper {
+  background: rgba(15, 23, 42, 0.95) !important;
+  color: #f8fafc !important;
+  border-radius: 0.75rem !important;
+  border: 1px solid rgba(56, 189, 248, 0.3) !important;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+}
+
+.leaflet-popup-tip {
+  background: rgba(15, 23, 42, 0.95) !important;
+}
