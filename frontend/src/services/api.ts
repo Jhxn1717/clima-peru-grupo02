@@ -109,6 +109,43 @@ export const weatherApi = {
     return `${API_BASE}/export/csv?city_id=${cityId}&export_type=${exportType}&days=${days}`;
   },
 
+  // Template CSV download URL
+  getTemplateCsvUrl(): string {
+    return `${API_BASE}/export/template`;
+  },
+
+  // Import / Upload CSV
+  async importCsv(file: File): Promise<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+    try {
+      const res = await fetch(`${API_BASE}/export/import-csv`, {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Error del servidor (${res.status}) al procesar el CSV`);
+      }
+
+      return await res.json();
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        throw new Error('Tiempo de espera agotado al comunicarse con el servidor.');
+      }
+      throw err;
+    }
+  },
+
   // Favorites
   async getFavorites(): Promise<City[]> {
     const res = await fetch(`${API_BASE}/favorites`);
@@ -124,3 +161,4 @@ export const weatherApi = {
     await fetch(`${API_BASE}/favorites/${cityId}`, { method: 'DELETE' });
   }
 };
+

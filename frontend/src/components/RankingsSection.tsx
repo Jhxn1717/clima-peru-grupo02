@@ -51,18 +51,18 @@ export const RankingsSection: React.FC<RankingsSectionProps> = ({ onSelectCityBy
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <Award className="w-5 h-5 text-amber-400" />
-            <h3 className="text-lg font-bold text-white tracking-tight">
+            <Award className="w-5 h-5 text-amber-500 dark:text-amber-400" />
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
               Rankings y Extremos Meteorológicos del Perú
             </h3>
           </div>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             Ciudades del territorio nacional con valores máximos y mínimos registrados en tiempo real.
           </p>
         </div>
 
         {/* Category Filter Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto p-1 bg-slate-900/90 rounded-2xl border border-slate-800 self-start sm:self-auto no-scrollbar">
+        <div className="flex items-center gap-1.5 overflow-x-auto p-1 bg-slate-100 dark:bg-slate-900/90 rounded-2xl border border-slate-200 dark:border-slate-800 self-start sm:self-auto no-scrollbar shadow-sm">
           {categories.map((cat) => {
             const Icon = cat.icon;
             const isActive = activeCategory === cat.id;
@@ -72,8 +72,8 @@ export const RankingsSection: React.FC<RankingsSectionProps> = ({ onSelectCityBy
                 onClick={() => setActiveCategory(cat.id as any)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
                   isActive
-                    ? 'bg-slate-800 text-white shadow-sm border border-slate-700'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-white text-slate-900 shadow-sm border border-slate-200 dark:bg-slate-800 dark:text-white dark:border-slate-700 font-bold'
+                    : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
                 }`}
               >
                 <Icon className={`w-3.5 h-3.5 ${cat.color}`} />
@@ -88,7 +88,7 @@ export const RankingsSection: React.FC<RankingsSectionProps> = ({ onSelectCityBy
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3 animate-pulse">
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-40 rounded-2xl bg-slate-900/60 p-4" />
+            <div key={i} className="h-40 rounded-2xl bg-slate-200/60 dark:bg-slate-900/60 p-4" />
           ))}
         </div>
       ) : (
@@ -96,10 +96,10 @@ export const RankingsSection: React.FC<RankingsSectionProps> = ({ onSelectCityBy
           {currentList.map((item: any, idx: number) => {
             const rank = idx + 1;
             const medalColor =
-              rank === 1 ? 'bg-amber-500/20 text-amber-300 border-amber-500/50' :
-              rank === 2 ? 'bg-slate-400/20 text-slate-300 border-slate-400/50' :
-              rank === 3 ? 'bg-amber-700/20 text-amber-400 border-amber-700/50' :
-              'bg-slate-800 text-slate-400 border-slate-700';
+              rank === 1 ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/50' :
+              rank === 2 ? 'bg-slate-200 dark:bg-slate-400/20 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-400/50' :
+              rank === 3 ? 'bg-amber-700/15 text-amber-800 dark:text-amber-400 border-amber-700/50' :
+              'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700';
 
             const displayMetric =
               activeCategory === 'hottest' ? `${item.temperature}°C` :
@@ -117,32 +117,32 @@ export const RankingsSection: React.FC<RankingsSectionProps> = ({ onSelectCityBy
                   <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black border ${medalColor}`}>
                     #{rank}
                   </span>
-                  <div className="p-1.5 rounded-lg bg-slate-900/80">
+                  <div className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-900/80 shadow-sm">
                     <WeatherIcon name={item.weather_icon} size={20} />
                   </div>
                 </div>
 
                 <div className="my-3">
-                  <h4 className="text-base font-bold text-white group-hover:text-sky-400 transition-colors truncate">
+                  <h4 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors truncate">
                     {item.city_name}
                   </h4>
-                  <div className="flex items-center gap-1 text-[11px] text-slate-400 mt-0.5">
-                    <MapPin className="w-3 h-3 text-sky-400" />
+                  <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    <MapPin className="w-3 h-3 text-sky-500 dark:text-sky-400" />
                     <span className="truncate">{item.department_name}</span>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-slate-800 flex items-baseline justify-between">
-                  <span className="text-[11px] text-slate-400">
+                <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-baseline justify-between">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
                     {activeCategory === 'hottest' || activeCategory === 'coldest' ? 'Temperatura' :
                      activeCategory === 'uv' ? 'Radiación' :
                      activeCategory === 'rain' ? 'Lluvia' : 'Viento'}
                   </span>
                   <strong className={`text-base font-extrabold ${
-                    activeCategory === 'hottest' ? 'text-rose-400' :
-                    activeCategory === 'coldest' ? 'text-cyan-300' :
-                    activeCategory === 'uv' ? 'text-amber-400' :
-                    activeCategory === 'rain' ? 'text-blue-400' : 'text-teal-400'
+                    activeCategory === 'hottest' ? 'text-rose-600 dark:text-rose-400' :
+                    activeCategory === 'coldest' ? 'text-cyan-600 dark:text-cyan-300' :
+                    activeCategory === 'uv' ? 'text-amber-600 dark:text-amber-400' :
+                    activeCategory === 'rain' ? 'text-blue-600 dark:text-blue-400' : 'text-teal-600 dark:text-teal-400'
                   }`}>
                     {displayMetric}
                   </strong>

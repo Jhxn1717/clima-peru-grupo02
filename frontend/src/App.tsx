@@ -10,6 +10,7 @@ import { CityComparison } from './components/CityComparison';
 import { ClimateAnalysis } from './components/ClimateAnalysis';
 import { WeatherAlerts } from './components/WeatherAlerts';
 import { RankingsSection } from './components/RankingsSection';
+import { CsvImporter } from './components/CsvImporter';
 import { SkeletonLoader } from './components/SkeletonLoader';
 import { Footer } from './components/Footer';
 import { City, FullForecastResponse, DepartmentWeatherSummary, AlertsResponse } from './types/weather';
@@ -17,6 +18,12 @@ import { weatherApi } from './services/api';
 import { MapPin, AlertCircle, RefreshCw, Sparkles } from 'lucide-react';
 
 export const App: React.FC = () => {
+  // Theme state ('dark' or 'light')
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const savedTheme = localStorage.getItem('meteoperu_theme');
+    return (savedTheme === 'light' || savedTheme === 'dark') ? savedTheme : 'dark';
+  });
+
   // State
   const [cities, setCities] = useState<City[]>([]);
   const [selectedCity, setSelectedCity] = useState<City | null>(null);
@@ -27,6 +34,22 @@ export const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Sync theme with HTML documentElement and localStorage
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
+    }
+    localStorage.setItem('meteoperu_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
 
   // Load initial cities catalogue
   useEffect(() => {
@@ -170,9 +193,9 @@ export const App: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-sky-500 selection:text-white">
+    <div className="min-h-screen flex flex-col bg-slate-100 text-slate-800 dark:bg-slate-950 dark:text-slate-100 selection:bg-sky-500 selection:text-white transition-colors duration-300">
       
-      {/* Top Navigation */}
+      {/* Top Navigation with Sol y Luna Toggle */}
       <Navbar
         cities={cities}
         selectedCity={selectedCity}
@@ -184,6 +207,8 @@ export const App: React.FC = () => {
         setActiveTab={setActiveTab}
         alertsCount={alertsSummary ? alertsSummary.danger_count + alertsSummary.warning_count : 0}
         onExportForecast={handleExportForecast}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
 
       {/* Main Container */}
@@ -191,8 +216,8 @@ export const App: React.FC = () => {
         
         {/* Quick Featured Cities Carousel Chips */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs">
-          <span className="text-slate-400 font-semibold uppercase tracking-wider text-[11px] shrink-0 flex items-center gap-1">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+          <span className="text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-[11px] shrink-0 flex items-center gap-1">
+            <Sparkles className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
             Acceso Rápido:
           </span>
           {featuredQuickCities.map((cName) => {
@@ -204,7 +229,7 @@ export const App: React.FC = () => {
                 className={`px-3 py-1 rounded-full whitespace-nowrap transition-all font-medium ${
                   isCurrent
                     ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20 font-bold'
-                    : 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-slate-800'
+                    : 'bg-white/90 hover:bg-slate-200/80 text-slate-700 border border-slate-200/80 shadow-sm dark:bg-slate-900/80 dark:hover:bg-slate-800 dark:text-slate-300 dark:border-slate-800'
                 }`}
               >
                 {cName}
@@ -215,14 +240,14 @@ export const App: React.FC = () => {
 
         {/* Error Alert Banner */}
         {error && (
-          <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-between gap-3 text-red-300 text-xs">
+          <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-between gap-3 text-red-600 dark:text-red-300 text-xs">
             <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+              <AlertCircle className="w-4 h-4 text-red-500 dark:text-red-400 shrink-0" />
               <span>{error}</span>
             </div>
             <button
               onClick={handleRefresh}
-              className="px-3 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 font-semibold transition-colors"
+              className="px-3 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-700 dark:text-red-200 font-semibold transition-colors"
             >
               Reintentar
             </button>
@@ -247,7 +272,7 @@ export const App: React.FC = () => {
 
                 {/* 4. Forecast Charts & 7-Day Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <WeatherCharts hourly={forecast.hourly} />
+                  <WeatherCharts hourly={forecast.hourly} theme={theme} />
                   <DailyForecast daily={forecast.daily} />
                 </div>
               </>
@@ -260,6 +285,7 @@ export const App: React.FC = () => {
             departmentsSummary={departmentsSummary}
             onSelectCityByName={handleSelectCityByName}
             selectedCity={selectedCity}
+            theme={theme}
           />
         )}
 
@@ -282,6 +308,10 @@ export const App: React.FC = () => {
           <RankingsSection onSelectCityByName={handleSelectCityByName} />
         )}
 
+        {activeTab === 'csv' && (
+          <CsvImporter theme={theme} />
+        )}
+
       </main>
 
       {/* Footer */}
@@ -292,3 +322,4 @@ export const App: React.FC = () => {
 };
 
 export default App;
+
