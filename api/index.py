@@ -22,4 +22,11 @@ if os.getenv("VERCEL") == "1" or (os.path.exists("/tmp") and os.name != "nt"):
                     print(f"Notice: could not copy db to /tmp: {e}")
 
 from app.main import app
+from app.seed.seed_data import init_db_and_seed
+
+try:
+    init_db_and_seed()
+except Exception as e:
+    print(f"Notice: init_db_and_seed on serverless: {e}")
+
 

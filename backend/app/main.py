@@ -38,16 +38,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include API Routers
-app.include_router(weather.router, prefix=settings.API_V1_STR)
-app.include_router(cities.router, prefix=settings.API_V1_STR)
-app.include_router(departments.router, prefix=settings.API_V1_STR)
-app.include_router(alerts.router, prefix=settings.API_V1_STR)
-app.include_router(compare.router, prefix=settings.API_V1_STR)
-app.include_router(history.router, prefix=settings.API_V1_STR)
-app.include_router(rankings.router, prefix=settings.API_V1_STR)
-app.include_router(export.router, prefix=settings.API_V1_STR)
-app.include_router(favorites.router, prefix=settings.API_V1_STR)
+# Include API Routers (with /api prefix and root prefix for serverless compatibility)
+for prefix in [settings.API_V1_STR, ""]:
+    app.include_router(weather.router, prefix=prefix)
+    app.include_router(cities.router, prefix=prefix)
+    app.include_router(departments.router, prefix=prefix)
+    app.include_router(alerts.router, prefix=prefix)
+    app.include_router(compare.router, prefix=prefix)
+    app.include_router(history.router, prefix=prefix)
+    app.include_router(rankings.router, prefix=prefix)
+    app.include_router(export.router, prefix=prefix)
+    app.include_router(favorites.router, prefix=prefix)
 
 @app.get("/")
 def root():
@@ -59,5 +60,7 @@ def root():
     }
 
 @app.get("/api/health")
+@app.get("/health")
 def health_check():
     return {"status": "healthy", "service": "clima-peru-api"}
+
