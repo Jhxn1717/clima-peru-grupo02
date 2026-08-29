@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from app.models.peru_geo import Department, City
+from app.models import Department, City, WeatherCache, FavoriteCity
 from app.database import engine, Base
 
 DEPARTMENTS_DATA = [

@@ -4,7 +4,8 @@ import shutil
 
 # Add backend directory to sys.path for Vercel Serverless Function runtime
 backend_dir = os.path.join(os.path.dirname(__file__), '..', 'backend')
-sys.path.insert(0, backend_dir)
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
 
 # On Vercel / Serverless, ensure SQLite database is copied to writable /tmp
 if os.getenv("VERCEL") == "1" or (os.path.exists("/tmp") and os.name != "nt"):
@@ -21,12 +22,20 @@ if os.getenv("VERCEL") == "1" or (os.path.exists("/tmp") and os.name != "nt"):
                 except Exception as e:
                     print(f"Notice: could not copy db to /tmp: {e}")
 
-from app.main import app
-from app.seed.seed_data import init_db_and_seed
-
 try:
+    from app.main import app
+    from app.seed.seed_data import init_db_and_seed
     init_db_and_seed()
 except Exception as e:
-    print(f"Notice: init_db_and_seed on serverless: {e}")
+    import traceback
+    err_msg = traceback.format_exc()
+    print(f"Serverless startup exception: {err_msg}")
+    from fastapi import FastAPI
+    from fastapi.responses import JSONResponse
+    app = FastAPI()
+    @app.api_route("/{path_name:path}", methods=["GET", "POST", "PUT", "DELETE"])
+    async def error_fallback(path_name: str):
+        return JSONResponse(status_code=500, content={"error": "Startup error", "details": str(e), "traceback": err_msg})
+
 
 
