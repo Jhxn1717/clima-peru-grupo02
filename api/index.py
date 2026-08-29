@@ -22,17 +22,14 @@ if os.getenv("VERCEL") == "1" or (os.path.exists("/tmp") and os.name != "nt"):
                 except Exception as e:
                     print(f"Notice: could not copy db to /tmp: {e}")
 
+# Import FastAPI app at top level for Vercel Python AST analysis
+from app.main import app  # type: ignore # pyright: ignore # noqa: E402
+from app.seed.seed_data import init_db_and_seed  # type: ignore # pyright: ignore # noqa: E402
+
 try:
-    from app.main import app  # type: ignore # pyright: ignore # noqa: E402
-    from app.seed.seed_data import init_db_and_seed  # type: ignore # pyright: ignore # noqa: E402
     init_db_and_seed()
 except Exception as e:
-    import traceback
-    err_msg = traceback.format_exc()
-    print(f"Serverless startup exception: {err_msg}")
-    from fastapi import FastAPI  # type: ignore # pyright: ignore # noqa: E402
-    from fastapi.responses import JSONResponse  # type: ignore # pyright: ignore # noqa: E402
-    app = FastAPI()
-    @app.api_route("/{path_name:path}", methods=["GET", "POST", "PUT", "DELETE"])
-    async def error_fallback(path_name: str):
-        return JSONResponse(status_code=500, content={"error": "Startup error", "details": str(e), "traceback": err_msg})
+    print(f"Notice: init_db_and_seed on serverless: {e}")
+
+# Vercel entrypoint handler
+handler = app
