@@ -1,4 +1,10 @@
 import os
+from dotenv import load_dotenv
+
+# Cargar variables desde .env (raíz del proyecto o carpeta backend)
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"))
+load_dotenv()
+
 try:
     from pydantic_settings import BaseSettings
 except ImportError:
@@ -19,5 +25,18 @@ class Settings(BaseSettings):
     OPEN_METEO_BASE_URL: str = "https://api.open-meteo.com/v1"
     OPEN_METEO_HISTORICAL_URL: str = "https://archive-api.open-meteo.com/v1"
     CORS_ORIGINS: list = ["*"]
+
+    # Autenticación (JWT)
+    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "clave-super-secreta-de-desarrollo-cambiar-en-produccion")
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRE_MINUTES: int = int(os.getenv("JWT_EXPIRE_MINUTES", 60))
+    VERIFICATION_CODE_EXPIRE_MINUTES: int = int(os.getenv("VERIFICATION_CODE_EXPIRE_MINUTES", 15))
+
+    # SMTP / Email (verificación por correo)
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", 587))
+    SMTP_USER: str = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_FROM: str = os.getenv("SMTP_FROM", "")
 
 settings = Settings()

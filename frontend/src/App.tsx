@@ -13,11 +13,15 @@ import { RankingsSection } from './components/RankingsSection';
 import { CsvImporter } from './components/CsvImporter';
 import { SkeletonLoader } from './components/SkeletonLoader';
 import { Footer } from './components/Footer';
+import { AuthProvider } from './context/AuthContext';
+import { AuthModal } from './components/Auth/AuthModal';
+import { AdminPanel } from './components/Admin/AdminPanel';
+import { useAuth } from './context/AuthContext';
 import { City, FullForecastResponse, DepartmentWeatherSummary, AlertsResponse } from './types/weather';
 import { weatherApi } from './services/api';
 import { MapPin, AlertCircle, RefreshCw, Sparkles } from 'lucide-react';
 
-export const App: React.FC = () => {
+const AppInner: React.FC = () => {
   // Theme state ('dark' or 'light')
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const savedTheme = localStorage.getItem('meteoperu_theme');
@@ -34,6 +38,24 @@ export const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
+  const { isAdmin, isAuthenticated } = useAuth();
+
+  // Guard: si se intenta acceder al panel admin sin ser admin, volver al dashboard
+  useEffect(() => {
+    if (activeTab === 'admin' && !isAdmin) {
+      setActiveTab('dashboard');
+    }
+  }, [activeTab, isAdmin]);
+
+  // Abrir login automáticamente cuando no hay sesión
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setIsAuthOpen(true);
+    } else {
+      setIsAuthOpen(false);
+    }
+  }, [isAuthenticated]);
 
   // Sync theme with HTML documentElement and localStorage
   useEffect(() => {
@@ -194,7 +216,42 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-100 text-slate-800 dark:bg-slate-950 dark:text-slate-100 selection:bg-sky-500 selection:text-white transition-colors duration-300">
-      
+
+      {!isAuthenticated ? (
+        /* ===== Pantalla de Bienvenida / Bloqueo por Login ===== */
+        <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 relative overflow-hidden">
+          <div className="absolute inset-0 -z-10 opacity-40">
+            <div className="absolute top-1/4 left-1/4 w-72 h-72 rounded-full bg-sky-600/30 blur-3xl" />
+            <div className="absolute bottom-1/4 right-1/4 w-80 h-80 rounded-full bg-rose-600/20 blur-3xl" />
+          </div>
+
+          <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-red-600 via-rose-500 to-sky-500 flex items-center justify-center shadow-2xl shadow-sky-500/20 mb-6">
+            <span className="text-3xl font-black text-white">PE</span>
+          </div>
+          <h1 className="text-4xl md:text-5xl font-black text-white mb-3">
+            Clima <span className="bg-gradient-to-r from-sky-400 to-rose-400 bg-clip-text text-transparent">Perú</span>
+          </h1>
+          <p className="text-slate-400 text-sm md:text-base max-w-md mb-8">
+            Sistema Meteorológico Nacional del Perú. Inicia sesión para consultar el clima, comparar ciudades, alertas y más.
+          </p>
+          <button
+            onClick={() => setIsAuthOpen(true)}
+            className="px-8 py-3 rounded-2xl bg-gradient-to-r from-sky-500 to-rose-500 hover:from-sky-400 hover:to-rose-400 text-white font-semibold shadow-lg shadow-sky-500/20 transition-all hover:scale-[1.02]"
+          >
+            Iniciar Sesión
+          </button>
+          <p className="text-xs text-slate-500 mt-4">
+            ¿Sin cuenta?{' '}
+            <button onClick={() => setIsAuthOpen(true)} className="text-sky-400 hover:underline font-semibold">
+              Regístrate gratis
+            </button>
+          </p>
+
+          {/* Auth Modal obligatoria en pantalla de bienvenida */}
+          <AuthModal open={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
+        </div>
+      ) : (
+        <>
       {/* Top Navigation with Sol y Luna Toggle */}
       <Navbar
         cities={cities}
@@ -209,6 +266,7 @@ export const App: React.FC = () => {
         onExportForecast={handleExportForecast}
         theme={theme}
         onToggleTheme={toggleTheme}
+        onOpenAuth={() => setIsAuthOpen(true)}
       />
 
       {/* Main Container */}
@@ -312,14 +370,29 @@ export const App: React.FC = () => {
           <CsvImporter theme={theme} />
         )}
 
+        {activeTab === 'admin' && isAdmin && (
+          <AdminPanel theme={theme} />
+        )}
+
       </main>
 
       {/* Footer */}
       <Footer />
 
+      {/* Auth Modal */}
+      <AuthModal open={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
+        </>
+      )}
+
     </div>
   );
 };
+
+export const App: React.FC = () => (
+  <AuthProvider>
+    <AppInner />
+  </AuthProvider>
+);
 
 export default App;
 
