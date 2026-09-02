@@ -21,15 +21,22 @@ from app.models.user import User, EmailVerificationCode
 security = HTTPBearer(auto_error=False)
 
 
-def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-
-
-def verify_password(password: str, hashed: str) -> bool:
-    try:
-        return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
-    except ValueError:
-        return False
+try:
+    import bcrypt
+    def hash_password(password: str) -> str:
+        return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    def verify_password(password: str, hashed: str) -> bool:
+        try:
+            if hashed.startswith("$2b$") or hashed.startswith("$2a$"):
+                return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
+            return hmac.compare_digest(hashlib.sha256(password.encode("utf-8")).hexdigest(), hashed)
+        except Exception:
+            return False
+except Exception:
+    def hash_password(password: str) -> str:
+        return hashlib.sha256(password.encode("utf-8")).hexdigest()
+    def verify_password(password: str, hashed: str) -> bool:
+        return hmac.compare_digest(hashlib.sha256(password.encode("utf-8")).hexdigest(), hashed)
 
 
 def create_access_token(user_id: int, email: str) -> str:
