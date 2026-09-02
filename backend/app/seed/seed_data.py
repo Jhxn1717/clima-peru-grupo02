@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
-from app.models import Department, City, WeatherCache, FavoriteCity
+from app.models import Department, City, WeatherCache, FavoriteCity, User, EmailVerificationCode
 from app.database import engine, Base
+from app.services.auth_service import hash_password
 
 DEPARTMENTS_DATA = [
     {"name": "Amazonas", "code": "AMA", "capital": "Chachapoyas", "latitude": -6.2317, "longitude": -77.8690, "region_natural": "Selva", "description": "Departamento del nororiente peruano, caracterizado por sus bosques de neblina y la fortaleza de Kuélap."},
@@ -173,6 +174,27 @@ def init_db_and_seed():
             print("Datos geográficos del Perú inicializados con éxito.")
         else:
             print("Base de datos ya cuenta con datos del Perú.")
+
+        # Seed default admin user if no admin exists
+        admin_user = db.query(User).filter(User.role == "admin").first()
+        if not admin_user:
+            default_admin = User(
+                full_name="Administrador Meteo",
+                email="arnoz1234@gmail.com",
+                hashed_password=hash_password("clima12345"),
+                is_verified=True,
+                role="admin",
+                perm_dashboard=True,
+                perm_map=True,
+                perm_compare=True,
+                perm_analysis=True,
+                perm_alerts=True,
+                perm_rankings=True,
+                perm_csv=True,
+            )
+            db.add(default_admin)
+            db.commit()
+            print("Usuario Administrador por defecto creado (arnoz1234@gmail.com).")
     except Exception as e:
         db.rollback()
         print(f"Error sembrando datos del Perú: {e}")
