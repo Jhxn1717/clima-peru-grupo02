@@ -32,7 +32,9 @@ import {
   Droplets,
   Wind,
   Lock,
-  ArrowRight
+  ArrowRight,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 const AppInner: React.FC = () => {
@@ -63,14 +65,9 @@ const AppInner: React.FC = () => {
     }
   }, [activeTab, isAdmin]);
 
-  // Abrir login automáticamente cuando no hay sesión
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setIsAuthOpen(true);
-    } else {
-      setIsAuthOpen(false);
-    }
-  }, [isAuthenticated]);
+  // Determine day/night time for dynamic atmospheric background
+  const currentHour = new Date().getHours();
+  const isDayTime = currentHour >= 6 && currentHour < 19;
 
   // Sync theme with HTML documentElement and localStorage
   useEffect(() => {
@@ -236,31 +233,55 @@ const AppInner: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-slate-100 text-slate-800 dark:bg-slate-950 dark:text-slate-100 selection:bg-sky-500 selection:text-white transition-colors duration-300">
 
       {!isAuthenticated ? (
-        /* ===== Pantalla de Bienvenida Cinematográfica con Video de Fondo ===== */
+        /* ===== Pantalla de Bienvenida Cinematográfica con Video de Fondo (Día / Noche Dinámico) ===== */
         <div className="min-h-screen flex flex-col items-center justify-between text-center relative overflow-hidden bg-slate-950 px-4 py-8 sm:py-12">
-          {/* Atmospheric Video Background (Vivid & Dynamic) */}
+          {/* Atmospheric Video Background (Vivid & Dynamic Day/Night) */}
           <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none z-0">
             <video
+              key={isDayTime ? 'day-weather-video' : 'night-weather-video'}
               autoPlay
               loop
               muted
               playsInline
-              className="w-full h-full object-cover scale-105 filter brightness-75 contrast-110 saturate-125"
-              poster="https://images.unsplash.com/photo-1534088568595-a066f410bcda?auto=format&fit=crop&w=1920&q=80"
+              className={`w-full h-full object-cover scale-105 filter ${
+                isDayTime
+                  ? 'brightness-90 contrast-110 saturate-125'
+                  : 'brightness-75 contrast-125 saturate-110'
+              }`}
+              poster={
+                isDayTime
+                  ? 'https://images.unsplash.com/photo-1534088568595-a066f410bcda?auto=format&fit=crop&w=1920&q=80'
+                  : 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1920&q=80'
+              }
             >
-              <source
-                src="https://assets.mixkit.co/videos/preview/mixkit-flying-through-clouds-in-a-sky-with-sunlight-41228-large.mp4"
-                type="video/mp4"
-              />
-              <source
-                src="https://assets.mixkit.co/videos/preview/mixkit-aerial-view-of-clouds-at-sunset-41235-large.mp4"
-                type="video/mp4"
-              />
+              {isDayTime ? (
+                <>
+                  <source
+                    src="https://assets.mixkit.co/videos/preview/mixkit-clouds-and-blue-sky-2408-large.mp4"
+                    type="video/mp4"
+                  />
+                  <source
+                    src="https://assets.mixkit.co/videos/preview/mixkit-flying-through-clouds-in-a-sky-with-sunlight-41228-large.mp4"
+                    type="video/mp4"
+                  />
+                </>
+              ) : (
+                <>
+                  <source
+                    src="https://assets.mixkit.co/videos/preview/mixkit-full-moon-with-passing-clouds-at-night-42999-large.mp4"
+                    type="video/mp4"
+                  />
+                  <source
+                    src="https://assets.mixkit.co/videos/preview/mixkit-night-sky-with-stars-and-clouds-timelapse-41315-large.mp4"
+                    type="video/mp4"
+                  />
+                </>
+              )}
             </video>
             {/* Elegant Frosted Diffuse Glass Overlays */}
-            <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]" />
+            <div className={`absolute inset-0 backdrop-blur-[2px] ${isDayTime ? 'bg-slate-950/30' : 'bg-slate-950/45'}`} />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-slate-950/50" />
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-sky-500/15 via-transparent to-transparent" />
+            <div className={`absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] ${isDayTime ? 'from-amber-400/15' : 'from-indigo-500/15'} via-transparent to-transparent`} />
           </div>
 
           {/* Top Brand Bar */}
@@ -294,14 +315,17 @@ const AppInner: React.FC = () => {
 
           {/* Center Hero Glass Card */}
           <div className="relative z-10 max-w-3xl w-full mx-auto my-auto py-8">
-            {/* Floating Status Pill */}
+            {/* Dynamic Day/Night Status Pill */}
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/80 border border-sky-500/30 backdrop-blur-xl mb-6 shadow-xl animate-fadeIn">
-              <span className="flex h-2 w-2 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
-              </span>
+              {isDayTime ? (
+                <Sun className="w-4 h-4 text-amber-400 animate-spin-slow" />
+              ) : (
+                <Moon className="w-4 h-4 text-sky-300" />
+              )}
               <span className="text-xs font-bold text-slate-200">
-                Red Meteorológica Nacional del Perú · 25 Departamentos
+                {isDayTime
+                  ? '☀️ Vista Diurna en Vivo · Sol & Nubes sobre Perú'
+                  : '🌙 Vista Nocturna en Vivo · Luna & Nubes sobre Perú'}
               </span>
               <Sparkles className="w-3.5 h-3.5 text-amber-400 ml-0.5" />
             </div>
