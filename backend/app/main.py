@@ -18,20 +18,10 @@ from app.routers import (
     admin
 )
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Initialize database tables and seed Peru geographic data on startup
-    try:
-        init_db_and_seed()
-    except Exception as e:
-        print(f"Notice: init_db_and_seed on lifespan startup: {e}")
-    yield
-
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="API REST para el Sistema Web de Clima y Datos Meteorológicos del Perú. Integra Open-Meteo, catálogos geográficos del Perú, pronósticos, comparador, análisis histórico y alertas climáticas.",
-    lifespan=lifespan
+    description="API REST para el Sistema Web de Clima y Datos Meteorológicos del Perú. Integra Open-Meteo, catálogos geográficos del Perú, pronósticos, comparador, análisis histórico y alertas climáticas."
 )
 
 # CORS configuration
