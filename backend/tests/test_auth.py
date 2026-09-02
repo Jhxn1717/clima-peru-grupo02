@@ -30,22 +30,12 @@ def test_full_register_verify_login_flow(mock_send):
     name = "Usuario Test"
     password = "secreto123"
 
-    # 1. Registro -> envía código
+    # 1. Registro -> cuenta creada y verificada
     r = client.post("/api/auth/register", json={"full_name": name, "email": email, "password": password})
     assert r.status_code == 201
-    mock_send.assert_called_once()
-    sent_code = mock_send.call_args.args[1]
 
-    # 2. Login antes de verificar -> prohibido
+    # 2. Login inmediato -> 200 OK
     r = client.post("/api/auth/login", json={"email": email, "password": password})
-    assert r.status_code == 403
-
-    # 3. Verificar con código incorrecto -> 400
-    r = client.post("/api/auth/verify", json={"email": email, "code": "000000"})
-    assert r.status_code == 400
-
-    # 4. Verificar con código correcto -> token + usuario verificado
-    r = client.post("/api/auth/verify", json={"email": email, "code": sent_code})
     assert r.status_code == 200
     data = r.json()
     assert data["user"]["is_verified"] is True
