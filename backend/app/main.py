@@ -18,10 +18,18 @@ from app.routers import (
     admin
 )
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Crear tablas y sembrar datos al arrancar
+    Base.metadata.create_all(bind=engine)
+    init_db_and_seed()
+    yield
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="API REST para el Sistema Web de Clima y Datos Meteorológicos del Perú. Integra Open-Meteo, catálogos geográficos del Perú, pronósticos, comparador, análisis histórico y alertas climáticas."
+    description="API REST para el Sistema Web de Clima y Datos Meteorológicos del Perú. Integra Open-Meteo, catálogos geográficos del Perú, pronósticos, comparador, análisis histórico y alertas climáticas.",
+    lifespan=lifespan,
 )
 
 # CORS configuration
