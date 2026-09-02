@@ -38,8 +38,6 @@ try:
     except Exception as e:
         print(f"Notice: init_db_and_seed on serverless: {e}")
 
-    handler = app
-
 except Exception as err:
     err_tb = traceback.format_exc()
     print(f"CRITICAL ERROR loading FastAPI app: {err_tb}")
@@ -60,5 +58,3 @@ except Exception as err:
                 "cwd": os.getcwd()
             }
         )
-
-    handler = app
