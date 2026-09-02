@@ -10,3 +10,6 @@ for p in [current_dir, backend_dir, root_dir]:
         sys.path.insert(0, p)
 
 from app.main import app  # type: ignore # pyright: ignore # noqa: E402
+from mangum import Mangum  # type: ignore # pyright: ignore # noqa: E402
+
+handler = Mangum(app, lifespan="off")
