@@ -1,3 +1,5 @@
+from __future__ import annotations
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -15,7 +17,7 @@ from app.services.auth_service import require_admin, hash_password
 router = APIRouter(prefix="/admin", tags=["Administración"])
 
 
-@router.get("/users", response_model=list[UserResponse])
+@router.get("/users", response_model=List[UserResponse])
 def list_users(
     current_admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
