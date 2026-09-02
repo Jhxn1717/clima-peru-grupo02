@@ -1,9 +1,10 @@
-import os
-from dotenv import load_dotenv
-
-# Cargar variables desde .env (raíz del proyecto o carpeta backend)
-load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"))
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    # Cargar variables desde .env (raíz del proyecto o carpeta backend)
+    load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"))
+    load_dotenv()
+except ImportError:
+    pass
 
 try:
     from pydantic_settings import BaseSettings
