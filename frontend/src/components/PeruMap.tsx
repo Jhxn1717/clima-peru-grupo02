@@ -61,12 +61,12 @@ export const PeruMap: React.FC<PeruMapProps> = ({
       });
 
       const tileUrl = theme === 'light'
-        ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-        : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+        ? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+        : 'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png';
 
       const tileLayer = L.tileLayer(tileUrl, {
-        subdomains: 'abcd',
-        maxZoom: 19
+        maxZoom: 19,
+        subdomains: 'abc'
       }).addTo(map);
 
       tileLayerRef.current = tileLayer;
@@ -91,8 +91,8 @@ export const PeruMap: React.FC<PeruMapProps> = ({
   useEffect(() => {
     if (!mapInstanceRef.current || !tileLayerRef.current) return;
     const tileUrl = theme === 'light'
-      ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+      ? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+      : 'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png';
 
     tileLayerRef.current.setUrl(tileUrl);
   }, [theme]);
