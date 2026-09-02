@@ -238,24 +238,29 @@ const AppInner: React.FC = () => {
       {!isAuthenticated ? (
         /* ===== Pantalla de Bienvenida Cinematográfica con Video de Fondo ===== */
         <div className="min-h-screen flex flex-col items-center justify-between text-center relative overflow-hidden bg-slate-950 px-4 py-8 sm:py-12">
-          {/* Atmospheric Video Background */}
+          {/* Atmospheric Video Background (Vivid & Dynamic) */}
           <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none z-0">
             <video
               autoPlay
               loop
               muted
               playsInline
-              className="w-full h-full object-cover scale-105 filter brightness-[0.45] contrast-125 saturate-110"
+              className="w-full h-full object-cover scale-105 filter brightness-75 contrast-110 saturate-125"
               poster="https://images.unsplash.com/photo-1534088568595-a066f410bcda?auto=format&fit=crop&w=1920&q=80"
             >
+              <source
+                src="https://assets.mixkit.co/videos/preview/mixkit-flying-through-clouds-in-a-sky-with-sunlight-41228-large.mp4"
+                type="video/mp4"
+              />
               <source
                 src="https://assets.mixkit.co/videos/preview/mixkit-aerial-view-of-clouds-at-sunset-41235-large.mp4"
                 type="video/mp4"
               />
             </video>
-            {/* Cinematic Gradient Overlays */}
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-slate-950/80" />
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-sky-500/10 via-transparent to-transparent" />
+            {/* Elegant Frosted Diffuse Glass Overlays */}
+            <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-slate-950/50" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-sky-500/15 via-transparent to-transparent" />
           </div>
 
           {/* Top Brand Bar */}
@@ -414,29 +419,31 @@ const AppInner: React.FC = () => {
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         
-        {/* Quick Featured Cities Carousel Chips */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs">
-          <span className="text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-[11px] shrink-0 flex items-center gap-1">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
-            Acceso Rápido:
-          </span>
-          {featuredQuickCities.map((cName) => {
-            const isCurrent = selectedCity?.name === cName;
-            return (
-              <button
-                key={cName}
-                onClick={() => handleSelectCityByName(cName)}
-                className={`px-3 py-1 rounded-full whitespace-nowrap transition-all font-medium ${
-                  isCurrent
-                    ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20 font-bold'
-                    : 'bg-white/90 hover:bg-slate-200/80 text-slate-700 border border-slate-200/80 shadow-sm dark:bg-slate-900/80 dark:hover:bg-slate-800 dark:text-slate-300 dark:border-slate-800'
-                }`}
-              >
-                {cName}
-              </button>
-            );
-          })}
-        </div>
+        {/* Quick Featured Cities Carousel Chips (Hidden on Admin Tab) */}
+        {activeTab !== 'admin' && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs">
+            <span className="text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-[11px] shrink-0 flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
+              Acceso Rápido:
+            </span>
+            {featuredQuickCities.map((cName) => {
+              const isCurrent = selectedCity?.name === cName;
+              return (
+                <button
+                  key={cName}
+                  onClick={() => handleSelectCityByName(cName)}
+                  className={`px-3 py-1 rounded-full whitespace-nowrap transition-all font-medium ${
+                    isCurrent
+                      ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20 font-bold'
+                      : 'bg-white/90 hover:bg-slate-200/80 text-slate-700 border border-slate-200/80 shadow-sm dark:bg-slate-900/80 dark:hover:bg-slate-800 dark:text-slate-300 dark:border-slate-800'
+                  }`}
+                >
+                  {cName}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Error Alert Banner */}
         {error && (
