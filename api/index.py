@@ -2,7 +2,7 @@ import sys
 import os
 import shutil
 
-# Ensure backend directory is in sys.path for Vercel Serverless Function runtime
+# Ensure current directory and candidate paths are in sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 backend_dir = os.path.abspath(os.path.join(current_dir, '..', 'backend'))
 root_dir = os.path.abspath(os.path.join(current_dir, '..'))
@@ -25,15 +25,18 @@ if os.getenv("VERCEL") == "1" or (os.path.exists("/tmp") and os.name != "nt"):
                     shutil.copyfile(candidate, tmp_db)
                     os.chmod(tmp_db, 0o666)
                     break
-                except Exception as e:
-                    print(f"Notice: could not copy db to /tmp: {e}")
+                except Exception:
+                    pass
     if os.path.exists(tmp_db):
         try:
             os.chmod(tmp_db, 0o666)
         except Exception:
             pass
 
-# Import FastAPI app at top level for Vercel Python AST analysis
 from app.main import app  # type: ignore # pyright: ignore # noqa: E402
 
-handler = app
+try:
+    from a2wsgi import ASGIMiddleware
+    handler = ASGIMiddleware(app)
+except Exception:
+    handler = app
