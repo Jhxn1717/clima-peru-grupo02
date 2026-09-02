@@ -7,7 +7,11 @@ from datetime import datetime, timedelta, timezone
 import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import jwt, JWTError
+try:
+    import jwt
+    JWTError = jwt.PyJWTError
+except ImportError:
+    from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 
 from app.config import settings

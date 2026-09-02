@@ -35,3 +35,13 @@ if os.getenv("VERCEL") == "1" or (os.path.exists("/tmp") and os.name != "nt"):
             pass
 
 from app.main import app  # type: ignore # pyright: ignore # noqa: E402
+from fastapi.responses import JSONResponse  # type: ignore # pyright: ignore # noqa: E402
+
+@app.get("/api/test-direct")
+def test_direct():
+    return {
+        "status": "ok",
+        "service": "clima-peru-vercel",
+        "tmp_db_exists": os.path.exists("/tmp/clima_peru.db"),
+        "tmp_db_size": os.path.getsize("/tmp/clima_peru.db") if os.path.exists("/tmp/clima_peru.db") else 0
+    }
