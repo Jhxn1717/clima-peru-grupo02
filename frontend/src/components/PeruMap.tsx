@@ -62,10 +62,10 @@ export const PeruMap: React.FC<PeruMapProps> = ({
 
       const tileUrl = theme === 'light'
         ? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-        : 'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png';
+        : 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
 
       const tileLayer = L.tileLayer(tileUrl, {
-        maxZoom: 19,
+        maxZoom: 16,
         subdomains: 'abc'
       }).addTo(map);
 
@@ -92,7 +92,7 @@ export const PeruMap: React.FC<PeruMapProps> = ({
     if (!mapInstanceRef.current || !tileLayerRef.current) return;
     const tileUrl = theme === 'light'
       ? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-      : 'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png';
+      : 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
 
     tileLayerRef.current.setUrl(tileUrl);
   }, [theme]);
