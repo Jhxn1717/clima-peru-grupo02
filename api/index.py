@@ -14,12 +14,12 @@ for p in [current_dir, os.path.join(current_dir, 'app'), backend_dir, root_dir]:
 # On Vercel / Serverless, ensure SQLite database is copied to writable /tmp with write permissions
 if os.getenv("VERCEL") == "1" or (os.path.exists("/tmp") and os.name != "nt"):
     tmp_db = "/tmp/clima_peru.db"
-    need_copy = not os.path.exists(tmp_db) or os.path.getsize(tmp_db) == 0
-    if need_copy:
+    if not os.path.exists(tmp_db) or os.path.getsize(tmp_db) == 0:
         for candidate in [
+            os.path.join(current_dir, "clima_peru.db"),
             os.path.join(current_dir, "..", "clima_peru.db"),
             os.path.join(backend_dir, "clima_peru.db"),
-            os.path.join(current_dir, "clima_peru.db"),
+            os.path.join(root_dir, "clima_peru.db"),
         ]:
             if os.path.exists(candidate) and os.path.getsize(candidate) > 0:
                 try:
@@ -35,12 +35,6 @@ if os.getenv("VERCEL") == "1" or (os.path.exists("/tmp") and os.name != "nt"):
             pass
 
 from app.main import app  # type: ignore # pyright: ignore # noqa: E402
-from app.seed.seed_data import init_db_and_seed  # type: ignore # pyright: ignore # noqa: E402
-
-try:
-    init_db_and_seed()
-except Exception as e:
-    print(f"Notice: init_db_and_seed on serverless: {e}")
 
 try:
     from mangum import Mangum
