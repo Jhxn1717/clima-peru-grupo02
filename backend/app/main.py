@@ -21,7 +21,10 @@ from app.routers import (
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize database tables and seed Peru geographic data on startup
-    init_db_and_seed()
+    try:
+        init_db_and_seed()
+    except Exception as e:
+        print(f"Notice: init_db_and_seed on lifespan startup: {e}")
     yield
 
 app = FastAPI(
