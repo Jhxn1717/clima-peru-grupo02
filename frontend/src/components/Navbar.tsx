@@ -12,6 +12,8 @@ import {
   Award,
   Download,
   FileSpreadsheet,
+  FileText,
+  ShieldCheck,
   LogIn,
   LogOut,
   UserRound,
@@ -249,21 +251,33 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="hidden sm:inline">Actualizar</span>
             </button>
 
-            {/* Export CSV Button */}
+            {/* Export PDF Button */}
             <button
               onClick={onExportForecast}
-              title="Descargar reporte CSV"
-              className="p-2 rounded-xl bg-white/90 hover:bg-slate-100 dark:bg-slate-900/80 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700/60 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 shadow-sm transition-colors"
+              title="Descargar reporte meteorológico en PDF"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-semibold shadow-sm transition-all group"
             >
-              <Download className="w-4 h-4" />
+              <FileText className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+              <span className="hidden sm:inline">Reporte PDF</span>
             </button>
 
             {/* Auth: Login / User */}
             {isAuthenticated && user ? (
               <div className="flex items-center gap-2">
-                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-600 dark:text-sky-400 shadow-sm">
-                  <UserRound className="w-3.5 h-3.5" />
-                  <span className="text-xs font-semibold max-w-[120px] truncate">{user.full_name}</span>
+                <div
+                  title={`Sesión Segura y Verificada (${user.role === 'admin' ? 'Administrador' : 'Usuario'})`}
+                  className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-slate-800 dark:text-slate-200 shadow-sm"
+                >
+                  <div className="relative flex items-center justify-center">
+                    <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
+                  </div>
+                  <span className="text-xs font-semibold max-w-[130px] truncate">{user.full_name}</span>
+                  {user.role === 'admin' && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold">
+                      ADMIN
+                    </span>
+                  )}
                 </div>
                 <button
                   onClick={logout}

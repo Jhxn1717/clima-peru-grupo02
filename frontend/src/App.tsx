@@ -19,7 +19,21 @@ import { AdminPanel } from './components/Admin/AdminPanel';
 import { useAuth } from './context/AuthContext';
 import { City, FullForecastResponse, DepartmentWeatherSummary, AlertsResponse } from './types/weather';
 import { weatherApi } from './services/api';
-import { MapPin, AlertCircle, RefreshCw, Sparkles } from 'lucide-react';
+import { generateWeatherReportPdf } from './utils/pdfExport';
+import {
+  MapPin,
+  AlertCircle,
+  RefreshCw,
+  Sparkles,
+  ShieldCheck,
+  CloudSun,
+  Compass,
+  BarChart3,
+  Droplets,
+  Wind,
+  Lock,
+  ArrowRight
+} from 'lucide-react';
 
 const AppInner: React.FC = () => {
   // Theme state ('dark' or 'light')
@@ -39,6 +53,7 @@ const AppInner: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
+  const [authInitialView, setAuthInitialView] = useState<'login' | 'register'>('login');
   const { isAdmin, isAuthenticated } = useAuth();
 
   // Guard: si se intenta acceder al panel admin sin ser admin, volver al dashboard
@@ -200,11 +215,14 @@ const AppInner: React.FC = () => {
     }
   };
 
-  // Export forecast CSV
+  // Export forecast as PDF
   const handleExportForecast = () => {
-    if (selectedCity) {
-      const url = weatherApi.getExportCsvUrl(selectedCity.id, 'forecast');
-      window.open(url, '_blank');
+    if (forecast) {
+      generateWeatherReportPdf(forecast, selectedCity);
+    } else if (selectedCity) {
+      weatherApi.getForecast(selectedCity.id).then((data) => {
+        generateWeatherReportPdf(data, selectedCity);
+      });
     }
   };
 
@@ -218,37 +236,161 @@ const AppInner: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-slate-100 text-slate-800 dark:bg-slate-950 dark:text-slate-100 selection:bg-sky-500 selection:text-white transition-colors duration-300">
 
       {!isAuthenticated ? (
-        /* ===== Pantalla de Bienvenida / Bloqueo por Login ===== */
-        <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 relative overflow-hidden">
-          <div className="absolute inset-0 -z-10 opacity-40">
-            <div className="absolute top-1/4 left-1/4 w-72 h-72 rounded-full bg-sky-600/30 blur-3xl" />
-            <div className="absolute bottom-1/4 right-1/4 w-80 h-80 rounded-full bg-rose-600/20 blur-3xl" />
+        /* ===== Pantalla de Bienvenida Cinematográfica con Video de Fondo ===== */
+        <div className="min-h-screen flex flex-col items-center justify-between text-center relative overflow-hidden bg-slate-950 px-4 py-8 sm:py-12">
+          {/* Atmospheric Video Background */}
+          <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none z-0">
+            <video
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full h-full object-cover scale-105 filter brightness-[0.45] contrast-125 saturate-110"
+              poster="https://images.unsplash.com/photo-1534088568595-a066f410bcda?auto=format&fit=crop&w=1920&q=80"
+            >
+              <source
+                src="https://assets.mixkit.co/videos/preview/mixkit-aerial-view-of-clouds-at-sunset-41235-large.mp4"
+                type="video/mp4"
+              />
+            </video>
+            {/* Cinematic Gradient Overlays */}
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-slate-950/80" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-sky-500/10 via-transparent to-transparent" />
           </div>
 
-          <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-red-600 via-rose-500 to-sky-500 flex items-center justify-center shadow-2xl shadow-sky-500/20 mb-6">
-            <span className="text-3xl font-black text-white">PE</span>
-          </div>
-          <h1 className="text-4xl md:text-5xl font-black text-white mb-3">
-            Clima <span className="bg-gradient-to-r from-sky-400 to-rose-400 bg-clip-text text-transparent">Perú</span>
-          </h1>
-          <p className="text-slate-400 text-sm md:text-base max-w-md mb-8">
-            Sistema Meteorológico Nacional del Perú. Inicia sesión para consultar el clima, comparar ciudades, alertas y más.
-          </p>
-          <button
-            onClick={() => setIsAuthOpen(true)}
-            className="px-8 py-3 rounded-2xl bg-gradient-to-r from-sky-500 to-rose-500 hover:from-sky-400 hover:to-rose-400 text-white font-semibold shadow-lg shadow-sky-500/20 transition-all hover:scale-[1.02]"
-          >
-            Iniciar Sesión
-          </button>
-          <p className="text-xs text-slate-500 mt-4">
-            ¿Sin cuenta?{' '}
-            <button onClick={() => setIsAuthOpen(true)} className="text-sky-400 hover:underline font-semibold">
-              Regístrate gratis
+          {/* Top Brand Bar */}
+          <header className="relative z-10 w-full max-w-6xl mx-auto flex items-center justify-between py-2">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-red-600 via-rose-500 to-sky-500 p-0.5 shadow-xl shadow-sky-500/20">
+                <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center">
+                  <span className="text-base font-black text-white">PE</span>
+                </div>
+              </div>
+              <div className="text-left">
+                <span className="text-lg font-black tracking-tight text-white">
+                  METEO<span className="text-sky-400">PERÚ</span>
+                </span>
+                <span className="ml-1.5 px-1.5 py-0.2 rounded bg-red-500/20 text-red-400 text-[10px] font-bold border border-red-500/30">
+                  PRO
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setAuthInitialView('login');
+                setIsAuthOpen(true);
+              }}
+              className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold backdrop-blur-md transition-all shadow-sm"
+            >
+              Acceso Institucional
             </button>
-          </p>
+          </header>
 
-          {/* Auth Modal obligatoria en pantalla de bienvenida */}
-          <AuthModal open={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
+          {/* Center Hero Glass Card */}
+          <div className="relative z-10 max-w-3xl w-full mx-auto my-auto py-8">
+            {/* Floating Status Pill */}
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/80 border border-sky-500/30 backdrop-blur-xl mb-6 shadow-xl animate-fadeIn">
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
+              </span>
+              <span className="text-xs font-bold text-slate-200">
+                Red Meteorológica Nacional del Perú · 25 Departamentos
+              </span>
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 ml-0.5" />
+            </div>
+
+            {/* Main Headline */}
+            <h1 className="text-4xl sm:text-6xl font-black text-white tracking-tight leading-tight mb-4">
+              Monitoreo del Clima en <br />
+              <span className="bg-gradient-to-r from-sky-400 via-rose-400 to-amber-300 bg-clip-text text-transparent">
+                Tiempo Real para el Perú
+              </span>
+            </h1>
+
+            <p className="text-slate-300 text-sm sm:text-base max-w-xl mx-auto mb-8 font-normal leading-relaxed drop-shadow">
+              Pronósticos satelitales de alta precisión, comparador interregional, alertas meteorológicas, análisis histórico y reportes oficiales en PDF.
+            </p>
+
+            {/* Live Weather Cities Ribbon (Interactive Preview) */}
+            <div className="flex items-center justify-center gap-2 sm:gap-3 flex-wrap mb-8">
+              {[
+                { city: 'Lima', temp: '23°C', icon: '☀️', cond: 'Despejado' },
+                { city: 'Cusco', temp: '18°C', icon: '⛅', cond: 'Parcial' },
+                { city: 'Arequipa', temp: '21°C', icon: '🌤️', cond: 'Soleado' },
+                { city: 'Iquitos', temp: '31°C', icon: '🌧️', cond: 'Húmedo' },
+              ].map((item, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-white/10 backdrop-blur-md text-xs font-semibold text-white shadow-md hover:border-sky-500/40 transition-colors"
+                >
+                  <span>{item.icon}</span>
+                  <span className="text-slate-300">{item.city}:</span>
+                  <span className="text-sky-400 font-bold">{item.temp}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Dual CTA Buttons */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5">
+              <button
+                onClick={() => {
+                  setAuthInitialView('register');
+                  setIsAuthOpen(true);
+                }}
+                className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-sky-600 hover:from-sky-400 hover:to-blue-500 text-white font-bold text-sm shadow-xl shadow-sky-500/30 transition-all hover:scale-[1.03] flex items-center justify-center gap-2"
+              >
+                <span>Crear Cuenta Gratis</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={() => {
+                  setAuthInitialView('login');
+                  setIsAuthOpen(true);
+                }}
+                className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-white font-bold text-sm backdrop-blur-md transition-all hover:scale-[1.03] flex items-center justify-center gap-2 shadow-lg"
+              >
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Iniciar Sesión</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Bottom Features Cards */}
+          <div className="relative z-10 w-full max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-3 pt-4 border-t border-white/10">
+            <div className="p-3 rounded-2xl bg-slate-900/60 border border-white/10 backdrop-blur-md text-left">
+              <Compass className="w-4 h-4 text-sky-400 mb-1.5" />
+              <div className="text-xs font-bold text-white">Mapa & 25 Regiones</div>
+              <div className="text-[11px] text-slate-400">Costa, Sierra y Selva</div>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-slate-900/60 border border-white/10 backdrop-blur-md text-left">
+              <CloudSun className="w-4 h-4 text-amber-400 mb-1.5" />
+              <div className="text-xs font-bold text-white">Pronóstico de 7 Días</div>
+              <div className="text-[11px] text-slate-400">Por horas & radiación UV</div>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-slate-900/60 border border-white/10 backdrop-blur-md text-left">
+              <BarChart3 className="w-4 h-4 text-emerald-400 mb-1.5" />
+              <div className="text-xs font-bold text-white">Análisis & Comparador</div>
+              <div className="text-[11px] text-slate-400">Histórico multivariado</div>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-slate-900/60 border border-white/10 backdrop-blur-md text-left">
+              <ShieldCheck className="w-4 h-4 text-rose-400 mb-1.5" />
+              <div className="text-xs font-bold text-white">Reportes Oficiales PDF</div>
+              <div className="text-[11px] text-slate-400">Exportación estructurada</div>
+            </div>
+          </div>
+
+          {/* Auth Modal with initial view */}
+          <AuthModal
+            open={isAuthOpen}
+            onClose={() => setIsAuthOpen(false)}
+            initialView={authInitialView}
+          />
         </div>
       ) : (
         <>

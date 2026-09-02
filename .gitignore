@@ -46,3 +46,4 @@ wheels/
 Thumbs.db
 
 .vercel
+.env*
