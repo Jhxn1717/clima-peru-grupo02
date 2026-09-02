@@ -1,47 +1,40 @@
 import sys
 import os
-import shutil
+from fastapi import FastAPI
 
-# Ensure current directory and candidate paths are in sys.path
-current_dir = os.path.dirname(os.path.abspath(__file__))
-backend_dir = os.path.abspath(os.path.join(current_dir, '..', 'backend'))
-root_dir = os.path.abspath(os.path.join(current_dir, '..'))
+app = FastAPI()
 
-for p in [current_dir, backend_dir, root_dir]:
-    if os.path.exists(p) and p not in sys.path:
-        sys.path.insert(0, p)
+@app.get("/api/health")
+@app.get("/health")
+def health():
+    return {"status": "ok", "message": "FastAPI is running on Vercel!"}
 
-# On Vercel / Serverless, ensure SQLite database is copied to writable /tmp with write permissions
-if os.getenv("VERCEL") == "1" or (os.path.exists("/tmp") and os.name != "nt"):
-    tmp_db = "/tmp/clima_peru.db"
-    if not os.path.exists(tmp_db) or os.path.getsize(tmp_db) == 0:
-        for candidate in [
-            os.path.join(current_dir, "clima_peru.db"),
-            os.path.join(current_dir, "..", "clima_peru.db"),
-            os.path.join(backend_dir, "clima_peru.db"),
-            os.path.join(root_dir, "clima_peru.db"),
-        ]:
-            if os.path.exists(candidate) and os.path.getsize(candidate) > 0:
-                try:
-                    shutil.copyfile(candidate, tmp_db)
-                    os.chmod(tmp_db, 0o666)
-                    break
-                except Exception as e:
-                    print(f"Notice: could not copy db to /tmp: {e}")
-    if os.path.exists(tmp_db):
+@app.get("/api/diag")
+@app.get("/diag")
+def diag():
+    diagnostics = {}
+    diagnostics["python_version"] = sys.version
+    diagnostics["cwd"] = os.getcwd()
+    diagnostics["sys_path"] = sys.path
+    
+    # Test dependencies
+    deps = ["fastapi", "pydantic", "sqlalchemy", "httpx", "bcrypt", "jwt", "dotenv"]
+    for dep in deps:
         try:
-            os.chmod(tmp_db, 0o666)
-        except Exception:
-            pass
+            __import__(dep)
+            diagnostics[f"import_{dep}"] = "OK"
+        except Exception as e:
+            diagnostics[f"import_{dep}"] = f"FAILED: {e}"
 
-from app.main import app  # type: ignore # pyright: ignore # noqa: E402
-from fastapi.responses import JSONResponse  # type: ignore # pyright: ignore # noqa: E402
+    # Test importing app.main
+    try:
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        if current_dir not in sys.path:
+            sys.path.insert(0, current_dir)
+        from app.main import app as main_app
+        diagnostics["import_app_main"] = "OK"
+    except Exception as e:
+        import traceback
+        diagnostics["import_app_main"] = f"FAILED: {e}\n{traceback.format_exc()}"
 
-@app.get("/api/test-direct")
-def test_direct():
-    return {
-        "status": "ok",
-        "service": "clima-peru-vercel",
-        "tmp_db_exists": os.path.exists("/tmp/clima_peru.db"),
-        "tmp_db_size": os.path.getsize("/tmp/clima_peru.db") if os.path.exists("/tmp/clima_peru.db") else 0
-    }
+    return diagnostics
