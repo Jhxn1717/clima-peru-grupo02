@@ -43,8 +43,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
     setLoading(true);
     try {
       await authApi.register({ full_name: fullName, email, password });
-      setInfo('Revisa tu correo, te enviamos un código de verificación.');
-      setView('verify');
+      const loginRes = await authApi.login({ email, password });
+      setSession(loginRes.access_token, loginRes.user);
+      onClose();
+      resetForm();
     } catch (err: any) {
       setError(err.message || 'Error al registrarse');
     } finally {
@@ -244,7 +246,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
                 className="w-full py-2.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                Enviar código de verificación
+                Crear Cuenta
               </button>
               <p className="text-center text-xs text-slate-500 dark:text-slate-400">
                 ¿Ya tienes cuenta?{' '}
