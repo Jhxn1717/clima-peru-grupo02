@@ -1,60 +1,49 @@
 import sys
 import os
 import shutil
-import traceback
 
-# Ensure all candidate paths are in sys.path for Vercel Serverless Function runtime
+# Ensure current directory and candidate paths are in sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 backend_dir = os.path.abspath(os.path.join(current_dir, '..', 'backend'))
 root_dir = os.path.abspath(os.path.join(current_dir, '..'))
 
-for p in [backend_dir, current_dir, root_dir, os.getcwd()]:
+for p in [current_dir, os.path.join(current_dir, 'app'), backend_dir, root_dir]:
     if os.path.exists(p) and p not in sys.path:
         sys.path.insert(0, p)
 
 # On Vercel / Serverless, ensure SQLite database is copied to writable /tmp with write permissions
 if os.getenv("VERCEL") == "1" or (os.path.exists("/tmp") and os.name != "nt"):
     tmp_db = "/tmp/clima_peru.db"
-    if not os.path.exists(tmp_db):
+    need_copy = not os.path.exists(tmp_db) or os.path.getsize(tmp_db) == 0
+    if need_copy:
         for candidate in [
+            os.path.join(current_dir, "..", "clima_peru.db"),
             os.path.join(backend_dir, "clima_peru.db"),
-            os.path.join(root_dir, "clima_peru.db"),
             os.path.join(current_dir, "clima_peru.db"),
         ]:
-            if os.path.exists(candidate):
+            if os.path.exists(candidate) and os.path.getsize(candidate) > 0:
                 try:
                     shutil.copyfile(candidate, tmp_db)
                     os.chmod(tmp_db, 0o666)
                     break
                 except Exception as e:
                     print(f"Notice: could not copy db to /tmp: {e}")
+    if os.path.exists(tmp_db):
+        try:
+            os.chmod(tmp_db, 0o666)
+        except Exception:
+            pass
+
+from app.main import app  # type: ignore # pyright: ignore # noqa: E402
+from app.seed.seed_data import init_db_and_seed  # type: ignore # pyright: ignore # noqa: E402
 
 try:
-    from app.main import app  # type: ignore # pyright: ignore # noqa: E402
-    from app.seed.seed_data import init_db_and_seed  # type: ignore # pyright: ignore # noqa: E402
+    init_db_and_seed()
+except Exception as e:
+    print(f"Notice: init_db_and_seed on serverless: {e}")
 
-    try:
-        init_db_and_seed()
-    except Exception as e:
-        print(f"Notice: init_db_and_seed on serverless: {e}")
-
-except Exception as err:
-    err_tb = traceback.format_exc()
-    print(f"CRITICAL ERROR loading FastAPI app: {err_tb}")
-    from fastapi import FastAPI
-    from fastapi.responses import JSONResponse
-
-    app = FastAPI(title="Clima Perú Diagnostic")
-
-    @app.api_route("/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
-    def catch_all(full_path: str):
-        return JSONResponse(
-            status_code=500,
-            content={
-                "error": "Server initialization error",
-                "message": str(err),
-                "traceback": err_tb,
-                "sys_path": sys.path,
-                "cwd": os.getcwd()
-            }
-        )
+try:
+    from mangum import Mangum
+    handler = Mangum(app, lifespan="off")
+except Exception:
+    handler = app
