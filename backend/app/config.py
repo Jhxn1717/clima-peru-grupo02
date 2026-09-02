@@ -1,3 +1,5 @@
+import os
+
 try:
     from dotenv import load_dotenv
     # Cargar variables desde .env (raíz del proyecto o carpeta backend)
