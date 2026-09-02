@@ -35,9 +35,3 @@ if os.getenv("VERCEL") == "1" or (os.path.exists("/tmp") and os.name != "nt"):
             pass
 
 from app.main import app  # type: ignore # pyright: ignore # noqa: E402
-
-try:
-    from mangum import Mangum
-    handler = Mangum(app, lifespan="off")
-except Exception:
-    handler = app
