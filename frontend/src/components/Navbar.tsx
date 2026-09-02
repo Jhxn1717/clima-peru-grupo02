@@ -11,10 +11,15 @@ import {
   Layers,
   Award,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  LogIn,
+  LogOut,
+  UserRound,
+  Settings
 } from 'lucide-react';
 import { City } from '../types/weather';
 import { ThemeSwitch } from './ThemeSwitch';
+import { useAuth } from '../context/AuthContext';
 
 interface NavbarProps {
   cities: City[];
@@ -29,6 +34,7 @@ interface NavbarProps {
   onExportForecast: () => void;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
+  onOpenAuth: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -43,12 +49,15 @@ export const Navbar: React.FC<NavbarProps> = ({
   alertsCount,
   onExportForecast,
   theme,
-  onToggleTheme
+  onToggleTheme,
+  onOpenAuth
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState('');
   const searchRef = useRef<HTMLDivElement>(null);
+
+  const { user, isAuthenticated, logout, isAdmin, hasPermission } = useAuth();
 
   // Real-time clock for Peru (UTC-5)
   useEffect(() => {
@@ -89,14 +98,29 @@ export const Navbar: React.FC<NavbarProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: Layers },
-    { id: 'map', label: 'Mapa del Perú', icon: Compass },
-    { id: 'compare', label: 'Comparar', icon: GitCompare },
-    { id: 'analysis', label: 'Análisis Histórico', icon: BarChart3 },
-    { id: 'alerts', label: 'Alertas', icon: Bell, badge: alertsCount > 0 ? alertsCount : null },
-    { id: 'rankings', label: 'Rankings', icon: Award },
-    { id: 'csv', label: 'Cargar CSV', icon: FileSpreadsheet },
+  interface NavItem {
+    id: string;
+    label: string;
+    icon: any;
+    perm: string;
+    badge?: number | null;
+  }
+
+  const baseNavItems: NavItem[] = [
+    { id: 'dashboard', label: 'Dashboard', icon: Layers, perm: 'dashboard' },
+    { id: 'map', label: 'Mapa del Perú', icon: Compass, perm: 'map' },
+    { id: 'compare', label: 'Comparar', icon: GitCompare, perm: 'compare' },
+    { id: 'analysis', label: 'Análisis Histórico', icon: BarChart3, perm: 'analysis' },
+    { id: 'alerts', label: 'Alertas', icon: Bell, perm: 'alerts', badge: alertsCount > 0 ? alertsCount : null },
+    { id: 'rankings', label: 'Rankings', icon: Award, perm: 'rankings' },
+    { id: 'csv', label: 'Cargar CSV', icon: FileSpreadsheet, perm: 'csv' },
+  ];
+  const adminNavItem: NavItem = { id: 'admin', label: 'Admin', icon: Settings, perm: 'admin' };
+
+  // Filtrar por permisos + agregar Admin solo si el usuario es admin
+  const navItems: NavItem[] = [
+    ...baseNavItems.filter((item) => hasPermission(item.perm)),
+    ...(isAdmin ? [adminNavItem] : []),
   ];
 
   const isDark = theme === 'dark';
@@ -233,6 +257,32 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Download className="w-4 h-4" />
             </button>
+
+            {/* Auth: Login / User */}
+            {isAuthenticated && user ? (
+              <div className="flex items-center gap-2">
+                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-600 dark:text-sky-400 shadow-sm">
+                  <UserRound className="w-3.5 h-3.5" />
+                  <span className="text-xs font-semibold max-w-[120px] truncate">{user.full_name}</span>
+                </div>
+                <button
+                  onClick={logout}
+                  title="Cerrar sesión"
+                  className="p-2 rounded-xl bg-white/90 hover:bg-slate-100 dark:bg-slate-900/80 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700/60 text-slate-600 dark:text-slate-300 hover:text-red-500 dark:hover:text-red-400 shadow-sm transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={onOpenAuth}
+                title="Iniciar sesión"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-sky-500 hover:bg-sky-600 text-white text-xs font-semibold shadow-sm transition-colors"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Iniciar Sesión</span>
+              </button>
+            )}
           </div>
 
         </div>

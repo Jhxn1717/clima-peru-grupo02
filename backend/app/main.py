@@ -13,7 +13,9 @@ from app.routers import (
     history,
     rankings,
     export,
-    favorites
+    favorites,
+    auth,
+    admin
 )
 
 @asynccontextmanager
@@ -49,6 +51,8 @@ for prefix in [settings.API_V1_STR, ""]:
     app.include_router(rankings.router, prefix=prefix)
     app.include_router(export.router, prefix=prefix)
     app.include_router(favorites.router, prefix=prefix)
+    app.include_router(auth.router, prefix=prefix)
+    app.include_router(admin.router, prefix=prefix)
 
 @app.get("/")
 def root():
