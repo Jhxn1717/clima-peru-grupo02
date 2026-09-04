@@ -55,7 +55,6 @@ const AppInner: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
-  const [authInitialView, setAuthInitialView] = useState<'login' | 'register'>('login');
   const { isAdmin, isAuthenticated } = useAuth();
 
   // Guard: si se intenta acceder al panel admin sin ser admin, volver al dashboard
@@ -233,55 +232,24 @@ const AppInner: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-slate-100 text-slate-800 dark:bg-slate-950 dark:text-slate-100 selection:bg-sky-500 selection:text-white transition-colors duration-300">
 
       {!isAuthenticated ? (
-        /* ===== Pantalla de Bienvenida Cinematográfica con Video de Fondo (Día / Noche Dinámico) ===== */
+        /* ===== Pantalla de Bienvenida Cinematográfica con Video de Fondo Optimizado ===== */
         <div className="min-h-screen flex flex-col items-center justify-between text-center relative overflow-hidden bg-slate-950 px-4 py-8 sm:py-12">
-          {/* Atmospheric Video Background (Vivid & Dynamic Day/Night) */}
+          {/* Atmospheric Video Background (Alto rendimiento, sin lag ni filtros pesados) */}
           <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none z-0">
             <video
-              key={isDayTime ? 'day-weather-video' : 'night-weather-video'}
               autoPlay
               loop
               muted
               playsInline
-              className={`w-full h-full object-cover scale-105 filter ${
-                isDayTime
-                  ? 'brightness-90 contrast-110 saturate-125'
-                  : 'brightness-75 contrast-125 saturate-110'
-              }`}
-              poster={
-                isDayTime
-                  ? 'https://images.unsplash.com/photo-1534088568595-a066f410bcda?auto=format&fit=crop&w=1920&q=80'
-                  : 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1920&q=80'
-              }
+              preload="auto"
+              className="w-full h-full object-cover transform-gpu pointer-events-none"
             >
-              {isDayTime ? (
-                <>
-                  <source
-                    src="https://assets.mixkit.co/videos/preview/mixkit-clouds-and-blue-sky-2408-large.mp4"
-                    type="video/mp4"
-                  />
-                  <source
-                    src="https://assets.mixkit.co/videos/preview/mixkit-flying-through-clouds-in-a-sky-with-sunlight-41228-large.mp4"
-                    type="video/mp4"
-                  />
-                </>
-              ) : (
-                <>
-                  <source
-                    src="https://assets.mixkit.co/videos/preview/mixkit-full-moon-with-passing-clouds-at-night-42999-large.mp4"
-                    type="video/mp4"
-                  />
-                  <source
-                    src="https://assets.mixkit.co/videos/preview/mixkit-night-sky-with-stars-and-clouds-timelapse-41315-large.mp4"
-                    type="video/mp4"
-                  />
-                </>
-              )}
+              <source src="/background.mp4" type="video/mp4" />
             </video>
-            {/* Elegant Frosted Diffuse Glass Overlays */}
-            <div className={`absolute inset-0 backdrop-blur-[2px] ${isDayTime ? 'bg-slate-950/30' : 'bg-slate-950/45'}`} />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-slate-950/50" />
-            <div className={`absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] ${isDayTime ? 'from-amber-400/15' : 'from-indigo-500/15'} via-transparent to-transparent`} />
+            {/* Capas de contraste visual ligeras sin backdrop-blur para máxima fluidez a 60fps */}
+            <div className="absolute inset-0 bg-slate-950/45 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/25 to-slate-950/50 pointer-events-none" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-sky-500/15 via-transparent to-transparent pointer-events-none" />
           </div>
 
           {/* Top Brand Bar */}
@@ -303,10 +271,7 @@ const AppInner: React.FC = () => {
             </div>
 
             <button
-              onClick={() => {
-                setAuthInitialView('login');
-                setIsAuthOpen(true);
-              }}
+              onClick={() => setIsAuthOpen(true)}
               className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold backdrop-blur-md transition-all shadow-sm"
             >
               Acceso Institucional
@@ -361,28 +326,15 @@ const AppInner: React.FC = () => {
               ))}
             </div>
 
-            {/* Dual CTA Buttons */}
+            {/* CTA Button */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5">
               <button
-                onClick={() => {
-                  setAuthInitialView('register');
-                  setIsAuthOpen(true);
-                }}
-                className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-sky-600 hover:from-sky-400 hover:to-blue-500 text-white font-bold text-sm shadow-xl shadow-sky-500/30 transition-all hover:scale-[1.03] flex items-center justify-center gap-2"
+                onClick={() => setIsAuthOpen(true)}
+                className="w-full sm:w-auto px-10 py-4 rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-sky-600 hover:from-sky-400 hover:to-blue-500 text-white font-bold text-base shadow-xl shadow-sky-500/30 transition-all hover:scale-[1.03] flex items-center justify-center gap-3"
               >
-                <span>Crear Cuenta Gratis</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-
-              <button
-                onClick={() => {
-                  setAuthInitialView('login');
-                  setIsAuthOpen(true);
-                }}
-                className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-white font-bold text-sm backdrop-blur-md transition-all hover:scale-[1.03] flex items-center justify-center gap-2 shadow-lg"
-              >
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Iniciar Sesión</span>
+                <ShieldCheck className="w-5 h-5 text-emerald-300" />
+                <span>Iniciar Sesión / Acceder</span>
+                <ArrowRight className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -414,11 +366,10 @@ const AppInner: React.FC = () => {
             </div>
           </div>
 
-          {/* Auth Modal with initial view */}
+          {/* Auth Modal */}
           <AuthModal
             open={isAuthOpen}
             onClose={() => setIsAuthOpen(false)}
-            initialView={authInitialView}
           />
         </div>
       ) : (

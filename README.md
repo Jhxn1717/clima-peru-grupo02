@@ -155,9 +155,10 @@ python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 En una nueva terminal:
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
+> ⚡ **Nota de velocidad:** Se recomienda usar `npm ci` en lugar de `npm install` porque instala directamente las dependencias fijadas en el `package-lock.json` sin recalcular versiones, reduciendo considerablemente el tiempo de descarga.
 > Abrir la aplicación web en el navegador: **http://localhost:5173**
 
 ---

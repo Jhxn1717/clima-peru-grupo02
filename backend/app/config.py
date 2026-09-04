@@ -11,7 +11,9 @@ except ImportError:
 
 # Detectar entorno serverless de Vercel o Linux read-only
 is_serverless = os.getenv("VERCEL") == "1" or (os.path.exists("/tmp") and os.name != "nt")
-default_db_url = "sqlite:////tmp/clima_peru.db" if is_serverless else "sqlite:///./clima_peru.db"
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+default_sqlite_path = os.path.join(backend_dir, "clima_peru.db").replace("\\", "/")
+default_db_url = "sqlite:////tmp/clima_peru.db" if is_serverless else f"sqlite:///{default_sqlite_path}"
 
 def _get_cors_origins() -> list:
     raw = os.getenv("CORS_ORIGINS", "*")

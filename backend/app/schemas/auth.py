@@ -1,6 +1,21 @@
 from pydantic import BaseModel, EmailStr, Field
 
 
+class GoogleAuthRequest(BaseModel):
+    credential: str | None = None
+    email: EmailStr | None = None
+    name: str | None = None
+
+
+class SendCodeRequest(BaseModel):
+    email: EmailStr
+
+
+class VerifyCodeRequest(BaseModel):
+    email: EmailStr
+    code: str = Field(..., min_length=6, max_length=6)
+
+
 class UserRegister(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=120)
     email: EmailStr

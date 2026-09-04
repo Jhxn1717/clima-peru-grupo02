@@ -1,82 +1,132 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Mail,
-  Lock,
-  User as UserIcon,
   ShieldCheck,
   Loader2,
   AlertCircle,
-  Eye,
-  EyeOff,
   Sparkles,
-  CloudSun
+  Lock,
+  KeyRound,
+  CheckCircle2,
+  ChevronLeft
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { authApi } from '../../services/authApi';
 
-type AuthView = 'login' | 'register';
-
 interface AuthModalProps {
   open: boolean;
   onClose: () => void;
-  initialView?: AuthView;
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose, initialView = 'login' }) => {
+export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
   const { setSession } = useAuth();
-  const [view, setView] = useState<AuthView>(initialView);
-  const [fullName, setFullName] = useState('');
+
+  // Mode: 'code_request' (ingresar correo) | 'code_verify' (código 6 dígitos) | 'password_login' (con contraseña)
+  const [authMode, setAuthMode] = useState<'code_request' | 'code_verify' | 'password_login'>('code_request');
   const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    let timer: any;
+    if (resendCooldown > 0) {
+      timer = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
 
   if (!open) return null;
 
   const resetForm = () => {
     setError(null);
     setInfo(null);
+    setCode('');
     setPassword('');
+    setAuthMode('code_request');
   };
 
-  const switchView = (v: AuthView) => {
-    setView(v);
-    resetForm();
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
+  // Enviar código de 6 dígitos al correo
+  const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email.trim() || !email.includes('@')) {
+      setError('Ingresa un correo electrónico válido');
+      return;
+    }
+
     setError(null);
     setInfo(null);
     setLoading(true);
+
     try {
-      await authApi.register({ full_name: fullName, email, password });
-      const loginRes = await authApi.login({ email, password });
-      setSession(loginRes.access_token, loginRes.user);
-      onClose();
-      resetForm();
+      await authApi.sendValidationCode(email.trim());
+      setInfo(`¡Código enviado! Revisa tu bandeja de entrada o spam.`);
+      setAuthMode('code_verify');
+      setResendCooldown(45);
     } catch (err: any) {
-      setError(err.message || 'Error al registrarse');
+      setError(err.message || 'Error al enviar el código de validación');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
+  // Validar código de 6 dígitos (inicia sesión o crea cuenta automáticamente)
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!code.trim() || code.trim().length !== 6) {
+      setError('El código debe contener los 6 dígitos numéricos');
+      return;
+    }
+
+    setError(null);
+    setInfo(null);
+    setLoading(true);
+
+    try {
+      const res = await authApi.verifyValidationCode(email.trim(), code.trim());
+      setSession(res.access_token, res.user);
+      onClose();
+      resetForm();
+    } catch (err: any) {
+      setError(err.message || 'Código incorrecto o expirado');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Reenviar código
+  const handleResend = async () => {
+    if (resendCooldown > 0) return;
+    setError(null);
+    setLoading(true);
+    try {
+      await authApi.sendValidationCode(email.trim());
+      setInfo(`Nuevo código enviado a ${email}`);
+      setResendCooldown(45);
+    } catch (err: any) {
+      setError(err.message || 'Error al reenviar código');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Iniciar sesión con contraseña (para administradores o cuentas creadas)
+  const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setInfo(null);
     setLoading(true);
     try {
-      const res = await authApi.login({ email, password });
+      const res = await authApi.login({ email: email.trim(), password });
       setSession(res.access_token, res.user);
       onClose();
       resetForm();
     } catch (err: any) {
-      setError(err.message || 'Error al iniciar sesión');
+      setError(err.message || 'Correo o contraseña incorrectos');
     } finally {
       setLoading(false);
     }
@@ -104,59 +154,37 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose, initialView
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
                   METEO<span className="text-sky-500">PERÚ</span>
                 </h3>
-                <span className="px-1.5 py-0.2 rounded bg-red-500/15 text-red-600 dark:text-red-400 text-[10px] font-bold">
+                <span className="px-1.5 py-0.2 rounded bg-sky-500/15 text-sky-600 dark:text-sky-400 text-[10px] font-bold">
                   PRO
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Sistema Meteorológico del Perú
+                Iniciar Sesión en el Sistema
               </p>
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={() => {
+              onClose();
+              resetForm();
+            }}
             className="p-2 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Switch View Tabs */}
-        <div className="px-6 pt-5">
-          <div className="grid grid-cols-2 p-1 rounded-2xl bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-xs font-bold">
-            <button
-              type="button"
-              onClick={() => switchView('login')}
-              className={`py-2.5 rounded-xl transition-all ${
-                view === 'login'
-                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-md font-bold'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-            >
-              Iniciar Sesión
-            </button>
-            <button
-              type="button"
-              onClick={() => switchView('register')}
-              className={`py-2.5 rounded-xl transition-all ${
-                view === 'register'
-                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-md font-bold'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-            >
-              Registrarse
-            </button>
-          </div>
-        </div>
-
         {/* Body Form */}
         <div className="p-6 space-y-4">
+          {/* Error Message */}
           {error && (
             <div className="flex items-center gap-2.5 text-xs text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/30 rounded-2xl px-3.5 py-2.5 animate-fadeIn">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span className="font-semibold">{error}</span>
             </div>
           )}
+
+          {/* Info Message */}
           {info && (
             <div className="flex items-center gap-2.5 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl px-3.5 py-2.5 animate-fadeIn">
               <Sparkles className="w-4 h-4 shrink-0" />
@@ -164,8 +192,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose, initialView
             </div>
           )}
 
-          {view === 'login' ? (
-            <form onSubmit={handleLogin} className="space-y-4">
+          {/* PASO 1: Ingreso de Correo para Código */}
+          {authMode === 'code_request' && (
+            <form onSubmit={handleSendCode} className="space-y-4">
+              <div className="text-center space-y-1">
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Acceso con Código de Validación
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Escribe tu correo electrónico para enviarte un código de acceso inmediato.
+                </p>
+              </div>
+
               <div className="relative">
                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
@@ -173,29 +211,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose, initialView
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Correo electrónico"
+                  placeholder="ejemplo@gmail.com"
                   className={inputClass}
                 />
-              </div>
-
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Contraseña"
-                  className={`${inputClass} pr-11`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((s) => !s)}
-                  tabIndex={-1}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-sky-500 p-1"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
               </div>
 
               <button
@@ -203,22 +221,96 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose, initialView
                 disabled={loading}
                 className="w-full py-3 rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-sky-600 hover:from-sky-400 hover:to-blue-500 text-white text-sm font-bold shadow-lg shadow-sky-500/25 transition-all disabled:opacity-50 flex items-center justify-center gap-2 hover:scale-[1.01]"
               >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudSun className="w-4 h-4" />}
-                Acceder a MeteoPerú
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                <span>Enviar Código de Validación</span>
               </button>
+
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null);
+                    setAuthMode('password_login');
+                  }}
+                  className="text-xs text-sky-500 hover:underline font-medium"
+                >
+                  ¿Prefieres ingresar con contraseña? Haz clic aquí
+                </button>
+              </div>
             </form>
-          ) : (
-            <form onSubmit={handleRegister} className="space-y-4">
+          )}
+
+          {/* PASO 2: Ingresar Código de 6 Dígitos */}
+          {authMode === 'code_verify' && (
+            <form onSubmit={handleVerifyCode} className="space-y-4 animate-fadeIn">
+              <div className="text-center space-y-1">
+                <div className="w-12 h-12 rounded-2xl bg-sky-500/10 text-sky-500 mx-auto flex items-center justify-center mb-2">
+                  <Mail className="w-6 h-6" />
+                </div>
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Ingresa tu Código de Validación
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Ingresa los 6 dígitos enviados a <strong className="text-slate-700 dark:text-slate-200">{email}</strong>
+                </p>
+              </div>
+
               <div className="relative">
-                <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
                   type="text"
                   required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Nombre completo"
-                  className={inputClass}
+                  maxLength={6}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="000000"
+                  autoFocus
+                  className={`${inputClass} text-center font-mono text-xl tracking-[0.35em] font-bold`}
                 />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading || code.length !== 6}
+                className="w-full py-3 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-600 to-sky-600 hover:from-emerald-400 hover:to-teal-500 text-white text-sm font-bold shadow-lg shadow-emerald-500/25 transition-all disabled:opacity-50 flex items-center justify-center gap-2 hover:scale-[1.01]"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                <span>Validar Código y Entrar</span>
+              </button>
+
+              <div className="flex items-center justify-between pt-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setAuthMode('code_request')}
+                  className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 flex items-center gap-1 font-medium"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  Cambiar correo
+                </button>
+
+                <button
+                  type="button"
+                  disabled={resendCooldown > 0 || loading}
+                  onClick={handleResend}
+                  className="text-sky-500 hover:text-sky-600 dark:text-sky-400 font-bold disabled:opacity-50"
+                >
+                  {resendCooldown > 0 ? `Reenviar en ${resendCooldown}s` : 'Reenviar código'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* PASO 3: Ingreso con Contraseña */}
+          {authMode === 'password_login' && (
+            <form onSubmit={handlePasswordLogin} className="space-y-4 animate-fadeIn">
+              <div className="text-center space-y-1 mb-2">
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center justify-center gap-1.5">
+                  <Lock className="w-4 h-4 text-sky-400" />
+                  <span>Acceso con Contraseña</span>
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Para administradores o cuentas con clave
+                </p>
               </div>
 
               <div className="relative">
@@ -236,39 +328,40 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onClose, initialView
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  type="password"
                   required
-                  minLength={6}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Contraseña (mínimo 6 caracteres)"
-                  className={`${inputClass} pr-11`}
+                  placeholder="Contraseña"
+                  className={inputClass}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((s) => !s)}
-                  tabIndex={-1}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-sky-500 p-1"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-600 to-sky-600 hover:from-emerald-400 hover:to-teal-500 text-white text-sm font-bold shadow-lg shadow-emerald-500/25 transition-all disabled:opacity-50 flex items-center justify-center gap-2 hover:scale-[1.01]"
+                className="w-full py-3 rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-sky-600 hover:from-sky-400 hover:to-blue-500 text-white text-sm font-bold shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-                Crear Cuenta & Entrar
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                <span>Ingresar al Sistema</span>
               </button>
+
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => setAuthMode('code_request')}
+                  className="text-xs text-sky-500 hover:underline"
+                >
+                  Volver al acceso con código por correo
+                </button>
+              </div>
             </form>
           )}
 
-          {/* Security Banner Footer */}
+          {/* Footer Informativo */}
           <div className="pt-3 border-t border-slate-200/80 dark:border-slate-800/80 flex items-center justify-center gap-2 text-[11px] text-slate-400">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-            <span>Conexión segura cifrada con Supabase PostgreSQL</span>
+            <span>Sin registro manual · Tu cuenta se crea automáticamente</span>
           </div>
         </div>
       </div>

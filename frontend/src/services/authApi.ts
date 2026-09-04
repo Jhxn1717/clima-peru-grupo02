@@ -4,6 +4,7 @@ import {
   VerifyRequest,
   LoginRequest,
   TokenResponse,
+  GoogleAuthRequest,
 } from '../types/auth';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
@@ -46,6 +47,35 @@ async function parseError(res: Response): Promise<string> {
 }
 
 export const authApi = {
+  async loginWithGoogle(payload: GoogleAuthRequest): Promise<TokenResponse> {
+    const res = await fetch(`${API_BASE}/auth/google`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json();
+  },
+
+  async sendValidationCode(email: string): Promise<{ message: string }> {
+    const res = await fetch(`${API_BASE}/auth/send-code`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json();
+  },
+
+  async verifyValidationCode(email: string, code: string): Promise<TokenResponse> {
+    const res = await fetch(`${API_BASE}/auth/verify-code`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, code }),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json();
+  },
   async register(payload: RegisterRequest): Promise<{ message: string }> {
     const res = await fetch(`${API_BASE}/auth/register`, {
       method: 'POST',

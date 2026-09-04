@@ -15,6 +15,21 @@ export interface User {
   perm_csv: boolean;
 }
 
+export interface GoogleAuthRequest {
+  credential?: string;
+  email?: string;
+  name?: string;
+}
+
+export interface SendCodeRequest {
+  email: string;
+}
+
+export interface VerifyCodeRequest {
+  email: string;
+  code: string;
+}
+
 export interface RegisterRequest {
   full_name: string;
   email: string;
