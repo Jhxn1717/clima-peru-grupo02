@@ -2,7 +2,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 
 class GoogleAuthRequest(BaseModel):
-    credential: str | None = None
+    credential: str
     email: EmailStr | None = None
     name: str | None = None
 
@@ -40,6 +40,7 @@ class UserResponse(BaseModel):
     id: int
     full_name: str
     email: str
+    avatar_url: str | None = None
     is_verified: bool
     role: str
     perm_dashboard: bool = True

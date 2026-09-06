@@ -36,11 +36,14 @@ class Settings:
     OPEN_METEO_HISTORICAL_URL: str = "https://archive-api.open-meteo.com/v1"
     CORS_ORIGINS: list = _get_cors_origins()
 
-    # Autenticación (JWT)
+    # Autenticación (JWT & Google)
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "clave-super-secreta-de-desarrollo-cambiar-en-produccion")
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = int(os.getenv("JWT_EXPIRE_MINUTES", 60))
     VERIFICATION_CODE_EXPIRE_MINUTES: int = int(os.getenv("VERIFICATION_CODE_EXPIRE_MINUTES", 15))
+    GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+
 
     # SMTP / Email (verificación por correo)
     SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")

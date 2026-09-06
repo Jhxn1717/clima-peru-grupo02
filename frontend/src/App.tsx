@@ -16,6 +16,7 @@ import { Footer } from './components/Footer';
 import { AuthProvider } from './context/AuthContext';
 import { AuthModal } from './components/Auth/AuthModal';
 import { AdminPanel } from './components/Admin/AdminPanel';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { useAuth } from './context/AuthContext';
 import { City, FullForecastResponse, DepartmentWeatherSummary, AlertsResponse } from './types/weather';
 import { weatherApi } from './services/api';
@@ -512,11 +513,26 @@ const AppInner: React.FC = () => {
   );
 };
 
-export const App: React.FC = () => (
-  <AuthProvider>
-    <AppInner />
-  </AuthProvider>
-);
+const DEFAULT_GOOGLE_CLIENT_ID = '119978105289-3bh4bsvlad5vint3tnlbp9iiu4bprg31.apps.googleusercontent.com';
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID;
+
+export const App: React.FC = () => {
+  const content = (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
+  );
+
+  if (googleClientId) {
+    return (
+      <GoogleOAuthProvider clientId={googleClientId}>
+        {content}
+      </GoogleOAuthProvider>
+    );
+  }
+
+  return content;
+};
 
 export default App;
 

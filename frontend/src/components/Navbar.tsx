@@ -268,10 +268,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                   title={`Sesión Segura y Verificada (${user.role === 'admin' ? 'Administrador' : 'Usuario'})`}
                   className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-slate-800 dark:text-slate-200 shadow-sm"
                 >
-                  <div className="relative flex items-center justify-center">
-                    <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
-                  </div>
+                  {user.avatar_url ? (
+                    <img
+                      src={user.avatar_url}
+                      alt={user.full_name}
+                      referrerPolicy="no-referrer"
+                      className="w-5 h-5 rounded-full object-cover border border-emerald-500/50 shadow-sm shrink-0"
+                    />
+                  ) : (
+                    <div className="relative flex items-center justify-center">
+                      <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
+                    </div>
+                  )}
                   <span className="text-xs font-semibold max-w-[130px] truncate">{user.full_name}</span>
                   {user.role === 'admin' && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold">

@@ -134,6 +134,18 @@ CITIES_DATA = [
 
 def init_db_and_seed():
     Base.metadata.create_all(bind=engine)
+    # Migración segura: agregar columna avatar_url a users si no existe
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            try:
+                conn.execute(text("SELECT avatar_url FROM users LIMIT 1"))
+            except Exception:
+                conn.execute(text("ALTER TABLE users ADD COLUMN avatar_url VARCHAR(500)"))
+                conn.commit()
+    except Exception:
+        pass
+
     db = Session(bind=engine)
     try:
         # Check if already seeded

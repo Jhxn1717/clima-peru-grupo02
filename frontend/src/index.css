@@ -111,3 +111,117 @@
   background: rgba(15, 23, 42, 0.95) !important;
 }
 
+/* Animación de ondas térmicas expansivas (Radar meteorológico) */
+.custom-map-marker {
+  overflow: visible !important;
+}
+
+/* Olas térmicas continuas expansivas (Heat waves) - Alto rendimiento GPU */
+.heat-wave-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate3d(-50%, -50%, 0);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.heat-wave-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate3d(-50%, -50%, 0);
+  border-radius: 9999px;
+  pointer-events: none;
+  animation: heat-wave-expand 2.6s cubic-bezier(0.16, 0.7, 0.35, 1) infinite;
+  will-change: transform, opacity;
+}
+
+.heat-wave-ring:nth-child(2) {
+  animation-delay: 0.85s;
+}
+
+.heat-wave-ring:nth-child(3) {
+  animation-delay: 1.7s;
+}
+
+@keyframes heat-wave-expand {
+  0% {
+    width: 14px;
+    height: 14px;
+    opacity: 0.95;
+    transform: translate3d(-50%, -50%, 0) scale(0.35);
+  }
+  50% {
+    opacity: 0.55;
+  }
+  100% {
+    width: 95px;
+    height: 95px;
+    opacity: 0;
+    transform: translate3d(-50%, -50%, 0) scale(1.65);
+  }
+}
+
+/* Pin Rojo de Puntos de Máximo Calor (Estilo Imagen 2) */
+.hot-spot-pin-wrapper {
+  animation: hot-pin-float 2.8s ease-in-out infinite;
+  transform-origin: bottom center;
+  will-change: transform;
+  cursor: pointer;
+}
+
+.hot-spot-pin-wrapper:hover {
+  transform: scale(1.25) translateY(-3px) !important;
+}
+
+@keyframes hot-pin-float {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -5px, 0);
+  }
+}
+
+/* Barrido de Radar Meteorológico / Onda Doppler (SENAMHI Style) */
+.radar-sweep-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 5;
+  opacity: 0.28;
+  mix-blend-mode: screen;
+}
+
+.radar-beam {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 900px;
+  height: 900px;
+  margin-top: -450px;
+  margin-left: -450px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 280deg,
+    rgba(239, 68, 68, 0.08) 320deg,
+    rgba(56, 189, 248, 0.45) 360deg
+  );
+  animation: radar-sweep-spin 8s linear infinite;
+  will-change: transform;
+}
+
+@keyframes radar-sweep-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+

@@ -1,10 +1,12 @@
 import base64
 import json
 import secrets
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport import requests as google_requests
 
+from app.config import settings
 from app.database import get_db
 from app.models.user import User
 from app.schemas.auth import (
@@ -50,58 +52,62 @@ def _build_token_response(user: User) -> TokenResponse:
 
 
 @router.post("/google", response_model=TokenResponse)
-async def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
-    """Inicia sesión con Google. Si el usuario no existe, se crea automáticamente."""
-    email = None
-    full_name = None
+def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
+    """Inicia sesión con Google usando ID Token verificado con google-auth."""
+    if not payload.credential:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El token de Google (credential) es requerido",
+        )
 
-    if payload.credential:
-        # Intentar validar el token con Google
-        try:
-            async with httpx.AsyncClient(timeout=8.0) as client:
-                res = await client.get(
-                    f"https://oauth2.googleapis.com/tokeninfo?id_token={payload.credential}"
-                )
-                if res.status_code == 200:
-                    data = res.json()
-                    email = data.get("email")
-                    full_name = data.get("name")
-        except Exception as e:
-            print(f"Aviso Google tokeninfo: {e}")
+    try:
+        # Validar el token con google-auth contra GOOGLE_CLIENT_ID
+        client_id = settings.GOOGLE_CLIENT_ID if settings.GOOGLE_CLIENT_ID else None
+        idinfo = google_id_token.verify_oauth2_token(
+            payload.credential,
+            google_requests.Request(),
+            client_id
+        )
+    except ValueError as err:
+        print(f"[AUTH-GOOGLE-ERROR] Token inválido o expirado: {err}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Token de Google inválido o expirado: {err}",
+        )
+    except Exception as err:
+        print(f"[AUTH-GOOGLE-ERROR] Error de verificación: {err}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error validando autenticación con Google: {err}",
+        )
 
-        # Fallback: decodificar payload JWT de Google directamente
-        if not email:
-            try:
-                parts = payload.credential.split(".")
-                if len(parts) >= 2:
-                    padding = "=" * (4 - len(parts[1]) % 4)
-                    decoded_bytes = base64.urlsafe_b64decode(parts[1] + padding)
-                    data = json.loads(decoded_bytes.decode("utf-8"))
-                    email = data.get("email")
-                    full_name = data.get("name")
-            except Exception as e:
-                print(f"Aviso decodificando JWT Google: {e}")
+    # Validar que el email esté verificado por Google
+    if not idinfo.get("email_verified"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El correo electrónico de Google no está verificado",
+        )
 
-    # Fallback si se pasaron email y nombre explícitos
-    if not email and payload.email:
-        email = payload.email
-        full_name = payload.name
-
+    email = idinfo.get("email")
     if not email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No se pudo obtener la identidad de la cuenta de Google",
+            detail="No se pudo obtener el correo electrónico de la cuenta de Google",
         )
+
+    full_name = idinfo.get("name")
+    avatar_url = idinfo.get("picture")
 
     normalized_email = email.lower().strip()
     user = db.query(User).filter(User.email == normalized_email).first()
 
     if not user:
-        # Crear cuenta automáticamente
+        # Crear cuenta automáticamente si no existe en la base de datos
         display_name = full_name.strip() if full_name else normalized_email.split("@")[0].capitalize()
         user = User(
             full_name=display_name,
             email=normalized_email,
+            avatar_url=avatar_url,
             hashed_password=auth_service.hash_password(secrets.token_urlsafe(24)),
             is_verified=True,
             role="user",
@@ -118,10 +124,18 @@ async def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db))
         db.refresh(user)
         print(f"[AUTH-GOOGLE] Nueva cuenta creada automáticamente: {normalized_email}")
     else:
+        # Vincular cuenta existente sin duplicar registros
+        updated = False
         if not user.is_verified:
             user.is_verified = True
+            updated = True
+        if avatar_url and getattr(user, "avatar_url", None) != avatar_url:
+            user.avatar_url = avatar_url
+            updated = True
+        if updated:
             db.commit()
             db.refresh(user)
+        print(f"[AUTH-GOOGLE] Cuenta vinculada con éxito: {normalized_email}")
 
     return _build_token_response(user)
 
