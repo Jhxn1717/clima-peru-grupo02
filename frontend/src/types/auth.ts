@@ -4,6 +4,7 @@ export interface User {
   id: number;
   full_name: string;
   email: string;
+  avatar_url?: string | null;
   is_verified: boolean;
   role: Role;
   perm_dashboard: boolean;
@@ -13,6 +14,21 @@ export interface User {
   perm_alerts: boolean;
   perm_rankings: boolean;
   perm_csv: boolean;
+}
+
+export interface GoogleAuthRequest {
+  credential: string;
+  email?: string;
+  name?: string;
+}
+
+export interface SendCodeRequest {
+  email: string;
+}
+
+export interface VerifyCodeRequest {
+  email: string;
+  code: string;
 }
 
 export interface RegisterRequest {

@@ -13,9 +13,12 @@ import { RankingsSection } from './components/RankingsSection';
 import { CsvImporter } from './components/CsvImporter';
 import { SkeletonLoader } from './components/SkeletonLoader';
 import { Footer } from './components/Footer';
+import { PortalHome } from './components/PortalHome';
+import { projects, PORTAL_ACTIVE_KEY } from './data/projects';
 import { AuthProvider } from './context/AuthContext';
 import { AuthModal } from './components/Auth/AuthModal';
 import { AdminPanel } from './components/Admin/AdminPanel';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { useAuth } from './context/AuthContext';
 import { City, FullForecastResponse, DepartmentWeatherSummary, AlertsResponse } from './types/weather';
 import { weatherApi } from './services/api';
@@ -34,7 +37,8 @@ import {
   Lock,
   ArrowRight,
   Sun,
-  Moon
+  Moon,
+  LayoutGrid
 } from 'lucide-react';
 
 const AppInner: React.FC = () => {
@@ -55,8 +59,35 @@ const AppInner: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
-  const [authInitialView, setAuthInitialView] = useState<'login' | 'register'>('login');
+  const [isPortal, setIsPortal] = useState<boolean>(() => {
+    try {
+      const stored = sessionStorage.getItem(PORTAL_ACTIVE_KEY);
+      return !stored || !projects.some((p) => p.id === stored && p.status === 'active');
+    } catch {
+      return true;
+    }
+  });
   const { isAdmin, isAuthenticated } = useAuth();
+
+  const openProject = (projectId: string) => {
+    try {
+      sessionStorage.setItem(PORTAL_ACTIVE_KEY, projectId);
+    } catch {
+      /* noop */
+    }
+    setIsPortal(false);
+    window.scrollTo(0, 0);
+  };
+
+  const backToPortal = () => {
+    try {
+      sessionStorage.removeItem(PORTAL_ACTIVE_KEY);
+    } catch {
+      /* noop */
+    }
+    setIsPortal(true);
+    window.scrollTo(0, 0);
+  };
 
   // Guard: si se intenta acceder al panel admin sin ser admin, volver al dashboard
   useEffect(() => {
@@ -124,6 +155,13 @@ const AppInner: React.FC = () => {
     loadGlobalOverview();
   }, [loadGlobalOverview]);
 
+  //Refresca el overview (mapa/dashboard) al volver a la pestaña Mapa
+  useEffect(() => {
+    if (activeTab === 'map') {
+      loadGlobalOverview();
+    }
+  }, [activeTab, loadGlobalOverview]);
+
   // Load weather for selected city
   const loadCityWeather = useCallback(async (city: City, showRefreshing: boolean = false) => {
     if (showRefreshing) setIsRefreshing(true);
@@ -147,6 +185,14 @@ const AppInner: React.FC = () => {
       loadCityWeather(selectedCity);
     }
   }, [selectedCity, loadCityWeather]);
+
+  // Después de guardar el dataset real, refresca overview + pronóstico seleccionado
+  const handleDatasetSaved = useCallback(async () => {
+    loadGlobalOverview();
+    if (selectedCity) {
+      loadCityWeather(selectedCity, true);
+    }
+  }, [loadGlobalOverview, loadCityWeather, selectedCity]);
 
   // Handle City Selection
   const handleSelectCity = (city: City) => {
@@ -212,13 +258,24 @@ const AppInner: React.FC = () => {
     }
   };
 
-  // Export forecast as PDF
+  // Export forecast as PDF (open in new tab as preview)
   const handleExportForecast = () => {
+    const openPdfPreview = (data: FullForecastResponse) => {
+      try {
+        const { blob } = generateWeatherReportPdf(data, selectedCity);
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } catch (err) {
+        console.error('Error al generar el reporte PDF:', err);
+      }
+    };
+
     if (forecast) {
-      generateWeatherReportPdf(forecast, selectedCity);
+      openPdfPreview(forecast);
     } else if (selectedCity) {
       weatherApi.getForecast(selectedCity.id).then((data) => {
-        generateWeatherReportPdf(data, selectedCity);
+        openPdfPreview(data);
       });
     }
   };
@@ -229,64 +286,49 @@ const AppInner: React.FC = () => {
     'Chiclayo', 'Iquitos', 'Huancayo', 'Puno', 'Tacna', 'Chimbote'
   ];
 
+  if (isPortal) {
+    return (
+      <PortalHome
+        onOpenProject={openProject}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-100 text-slate-800 dark:bg-slate-950 dark:text-slate-100 selection:bg-sky-500 selection:text-white transition-colors duration-300">
 
       {!isAuthenticated ? (
-        /* ===== Pantalla de Bienvenida Cinematográfica con Video de Fondo (Día / Noche Dinámico) ===== */
+        /* ===== Pantalla de Bienvenida Cinematográfica con Video de Fondo Optimizado ===== */
         <div className="min-h-screen flex flex-col items-center justify-between text-center relative overflow-hidden bg-slate-950 px-4 py-8 sm:py-12">
-          {/* Atmospheric Video Background (Vivid & Dynamic Day/Night) */}
+          {/* Atmospheric Video Background (Alto rendimiento, sin lag ni filtros pesados) */}
           <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none z-0">
             <video
-              key={isDayTime ? 'day-weather-video' : 'night-weather-video'}
               autoPlay
               loop
               muted
               playsInline
-              className={`w-full h-full object-cover scale-105 filter ${
-                isDayTime
-                  ? 'brightness-90 contrast-110 saturate-125'
-                  : 'brightness-75 contrast-125 saturate-110'
-              }`}
-              poster={
-                isDayTime
-                  ? 'https://images.unsplash.com/photo-1534088568595-a066f410bcda?auto=format&fit=crop&w=1920&q=80'
-                  : 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1920&q=80'
-              }
+              preload="auto"
+              className="w-full h-full object-cover transform-gpu pointer-events-none"
             >
-              {isDayTime ? (
-                <>
-                  <source
-                    src="https://assets.mixkit.co/videos/preview/mixkit-clouds-and-blue-sky-2408-large.mp4"
-                    type="video/mp4"
-                  />
-                  <source
-                    src="https://assets.mixkit.co/videos/preview/mixkit-flying-through-clouds-in-a-sky-with-sunlight-41228-large.mp4"
-                    type="video/mp4"
-                  />
-                </>
-              ) : (
-                <>
-                  <source
-                    src="https://assets.mixkit.co/videos/preview/mixkit-full-moon-with-passing-clouds-at-night-42999-large.mp4"
-                    type="video/mp4"
-                  />
-                  <source
-                    src="https://assets.mixkit.co/videos/preview/mixkit-night-sky-with-stars-and-clouds-timelapse-41315-large.mp4"
-                    type="video/mp4"
-                  />
-                </>
-              )}
+              <source src="/background.mp4" type="video/mp4" />
             </video>
-            {/* Elegant Frosted Diffuse Glass Overlays */}
-            <div className={`absolute inset-0 backdrop-blur-[2px] ${isDayTime ? 'bg-slate-950/30' : 'bg-slate-950/45'}`} />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-slate-950/50" />
-            <div className={`absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] ${isDayTime ? 'from-amber-400/15' : 'from-indigo-500/15'} via-transparent to-transparent`} />
+            {/* Capas de contraste visual ligeras sin backdrop-blur para máxima fluidez a 60fps */}
+            <div className="absolute inset-0 bg-slate-950/45 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/25 to-slate-950/50 pointer-events-none" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-sky-500/15 via-transparent to-transparent pointer-events-none" />
           </div>
 
           {/* Top Brand Bar */}
           <header className="relative z-10 w-full max-w-6xl mx-auto flex items-center justify-between py-2">
             <div className="flex items-center gap-3">
+              <button
+                onClick={backToPortal}
+                title="Volver al Portal de Proyectos"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold backdrop-blur-md transition-all shadow-sm"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Portal</span>
+              </button>
               <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-red-600 via-rose-500 to-sky-500 p-0.5 shadow-xl shadow-sky-500/20">
                 <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center">
                   <span className="text-base font-black text-white">PE</span>
@@ -303,10 +345,7 @@ const AppInner: React.FC = () => {
             </div>
 
             <button
-              onClick={() => {
-                setAuthInitialView('login');
-                setIsAuthOpen(true);
-              }}
+              onClick={() => setIsAuthOpen(true)}
               className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold backdrop-blur-md transition-all shadow-sm"
             >
               Acceso Institucional
@@ -361,28 +400,15 @@ const AppInner: React.FC = () => {
               ))}
             </div>
 
-            {/* Dual CTA Buttons */}
+            {/* CTA Button */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5">
               <button
-                onClick={() => {
-                  setAuthInitialView('register');
-                  setIsAuthOpen(true);
-                }}
-                className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-sky-600 hover:from-sky-400 hover:to-blue-500 text-white font-bold text-sm shadow-xl shadow-sky-500/30 transition-all hover:scale-[1.03] flex items-center justify-center gap-2"
+                onClick={() => setIsAuthOpen(true)}
+                className="w-full sm:w-auto px-10 py-4 rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-sky-600 hover:from-sky-400 hover:to-blue-500 text-white font-bold text-base shadow-xl shadow-sky-500/30 transition-all hover:scale-[1.03] flex items-center justify-center gap-3"
               >
-                <span>Crear Cuenta Gratis</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-
-              <button
-                onClick={() => {
-                  setAuthInitialView('login');
-                  setIsAuthOpen(true);
-                }}
-                className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-white font-bold text-sm backdrop-blur-md transition-all hover:scale-[1.03] flex items-center justify-center gap-2 shadow-lg"
-              >
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Iniciar Sesión</span>
+                <ShieldCheck className="w-5 h-5 text-emerald-300" />
+                <span>Iniciar Sesión / Acceder</span>
+                <ArrowRight className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -414,11 +440,10 @@ const AppInner: React.FC = () => {
             </div>
           </div>
 
-          {/* Auth Modal with initial view */}
+          {/* Auth Modal */}
           <AuthModal
             open={isAuthOpen}
             onClose={() => setIsAuthOpen(false)}
-            initialView={authInitialView}
           />
         </div>
       ) : (
@@ -438,6 +463,7 @@ const AppInner: React.FC = () => {
         theme={theme}
         onToggleTheme={toggleTheme}
         onOpenAuth={() => setIsAuthOpen(true)}
+        onBackToPortal={backToPortal}
       />
 
       {/* Main Container */}
@@ -540,7 +566,7 @@ const AppInner: React.FC = () => {
         )}
 
         {activeTab === 'csv' && (
-          <CsvImporter theme={theme} />
+          <CsvImporter theme={theme} onDatasetSaved={handleDatasetSaved} />
         )}
 
         {activeTab === 'admin' && isAdmin && (
@@ -561,11 +587,26 @@ const AppInner: React.FC = () => {
   );
 };
 
-export const App: React.FC = () => (
-  <AuthProvider>
-    <AppInner />
-  </AuthProvider>
-);
+const DEFAULT_GOOGLE_CLIENT_ID = '119978105289-3bh4bsvlad5vint3tnlbp9iiu4bprg31.apps.googleusercontent.com';
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID;
+
+export const App: React.FC = () => {
+  const content = (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
+  );
+
+  if (googleClientId) {
+    return (
+      <GoogleOAuthProvider clientId={googleClientId}>
+        {content}
+      </GoogleOAuthProvider>
+    );
+  }
+
+  return content;
+};
 
 export default App;
 

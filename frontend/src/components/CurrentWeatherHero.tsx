@@ -56,6 +56,16 @@ export const CurrentWeatherHero: React.FC<CurrentWeatherHeroProps> = ({ weather 
                 Región {weather.region_natural}
               </span>
             )}
+            {weather.data_source === 'real' && (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold border bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">
+                Datos Reales
+              </span>
+            )}
+            {weather.data_source === 'simulado' && (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold border bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30">
+                Datos Simulados
+              </span>
+            )}
             {weather.altitude !== undefined && weather.altitude !== null && (
               <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-sm">
                 <Mountain className="w-3 h-3 text-slate-400" />

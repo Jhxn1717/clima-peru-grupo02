@@ -35,6 +35,9 @@ wheels/
 *.db
 *.sqlite3
 
+# Logs runtime
+backend/logs/
+
 # Environment variables
 .env
 .env.local

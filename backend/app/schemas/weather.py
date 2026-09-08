@@ -35,6 +35,7 @@ class CurrentWeather(BaseModel):
     altitude: Optional[int] = None
     latitude: float
     longitude: float
+    data_source: str = "simulado"  # "real" (dataset CSV) | "simulado" (API/fallback)
 
 class HourlyForecastItem(BaseModel):
     time: str # "2026-08-24T14:00"
@@ -86,3 +87,4 @@ class DepartmentWeatherSummary(BaseModel):
     precipitation: float
     uv_index: float
     wind_speed: float
+    data_source: str = "simulado"  # "real" (dataset CSV) | "simulado" (API/fallback)
