@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from app.models import Department, City, WeatherCache, FavoriteCity, User, EmailVerificationCode
+from app.models import Department, City, WeatherCache, FavoriteCity, User, EmailVerificationCode, WeatherRecord
 from app.database import engine, Base
 from app.services.auth_service import hash_password
 

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.weather_cache import WeatherCache
 from app.models.peru_geo import City, Department
+from app.models.weather_record import WeatherRecord
 from app.schemas.weather import (
     CurrentWeather, HourlyForecastItem, DailyForecastItem,
     FullForecastResponse, DepartmentWeatherSummary
@@ -76,6 +77,28 @@ def get_weather_meta(code: int, is_day: bool = True) -> tuple[str, str]:
         elif icon == "CloudSunRain":
             icon = "CloudMoonRain"
     return meta["desc"], icon
+
+def _condition_to_code(condition: Optional[str]) -> int:
+    c = (condition or "").lower()
+    if "despejado" in c or "cielo claro" in c:
+        return 0
+    if "parcialmente nublado" in c or "nubosidad parcial" in c:
+        return 2
+    if "nublado" in c:
+        return 3
+    if "llovizna" in c:
+        return 51
+    if "lluvia" in c or "chubasco" in c:
+        return 61
+    if "neblina" in c or "bruma" in c:
+        return 45
+    if "tormenta" in c:
+        return 95
+    if "nieve" in c:
+        return 73
+    if "granizo" in c:
+        return 96
+    return 1
 
 # In-memory fast cache
 _MEMORY_CACHE: Dict[str, Dict[str, Any]] = {}
@@ -150,6 +173,26 @@ class WeatherService:
                 region_natural = city_obj.department.region_natural if city_obj.department else ""
                 altitude = city_obj.altitude
 
+        if city_id and db:
+            real_records = (
+                db.query(WeatherRecord)
+                .filter(WeatherRecord.city_id == city_id)
+                .order_by(WeatherRecord.record_date.desc(), WeatherRecord.id.desc())
+                .limit(200)
+                .all()
+            )
+            if real_records:
+                return cls._build_forecast_from_records(
+                    real_records,
+                    city_name,
+                    department_name,
+                    region_natural,
+                    altitude,
+                    city_id,
+                    lat,
+                    lon,
+                )
+
         raw = await cls.fetch_open_meteo_raw(lat, lon)
         current_raw = raw.get("current", {})
         hourly_raw = raw.get("hourly", {})
@@ -205,7 +248,8 @@ class WeatherService:
             region_natural=region_natural,
             altitude=altitude,
             latitude=lat,
-            longitude=lon
+            longitude=lon,
+            data_source="simulado"
         )
 
         # Parse next 24-36 hourly items
@@ -276,11 +320,206 @@ class WeatherService:
         )
 
     @classmethod
+    def _build_forecast_from_records(
+        cls,
+        records: List[WeatherRecord],
+        city_name: Optional[str],
+        department_name: Optional[str],
+        region_natural: Optional[str],
+        altitude: Optional[int],
+        city_id: Optional[int],
+        lat: float,
+        lon: float,
+    ) -> FullForecastResponse:
+        """Construye el pronóstico completo a partir de los registros reales del dataset."""
+        latest_date = records[0].record_date
+        day_rows = [r for r in records if r.record_date == latest_date]
+
+        temps = [r.temperature for r in day_rows if r.temperature is not None]
+        mean_t = round(sum(temps) / len(temps), 1) if temps else 20.0
+        temp_max = round(
+            max((r.temp_max for r in day_rows if r.temp_max is not None), default=mean_t + 3), 1
+        )
+        temp_min = round(
+            min((r.temp_min for r in day_rows if r.temp_min is not None), default=mean_t - 3), 1
+        )
+        hums = [r.humidity for r in day_rows if r.humidity is not None]
+        humidity = int(sum(hums) / len(hums)) if hums else 75
+        precip = round(sum((r.precipitation or 0.0) for r in day_rows), 1)
+        winds = [r.wind_speed for r in day_rows if r.wind_speed is not None]
+        wind = round(sum(winds) / len(winds), 1) if winds else round(10.0 + (lat % 5), 1)
+        uvs = [r.uv_index for r in day_rows if r.uv_index is not None]
+        uv = round(max(uvs), 1) if uvs else round(max(0.0, mean_t - 14.0), 1)
+
+        condition = next((r.condition for r in day_rows if r.condition), "Reporte Cargado")
+        weather_code = _condition_to_code(condition)
+        desc, icon = get_weather_meta(weather_code, True)
+
+        current = CurrentWeather(
+            temperature=mean_t,
+            apparent_temperature=mean_t,
+            relative_humidity=humidity,
+            wind_speed=wind,
+            wind_direction=0,
+            wind_gusts=None,
+            surface_pressure=1013.25,
+            precipitation=precip,
+            precipitation_probability=85 if precip > 0.1 else 10,
+            cloud_cover=70 if weather_code == 3 else 20,
+            uv_index=max(0.0, uv),
+            uv_category=get_uv_category(uv),
+            weather_code=weather_code,
+            weather_description=desc,
+            weather_icon=icon,
+            is_day=True,
+            temp_max=temp_max,
+            temp_min=temp_min,
+            sunrise="06:00",
+            sunset="18:00",
+            updated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            city_id=city_id,
+            city_name=city_name or "Ubicación en Perú",
+            department_name=department_name,
+            region_natural=region_natural,
+            altitude=altitude,
+            latitude=lat,
+            longitude=lon,
+            data_source="real",
+        )
+
+        daily_items: List[DailyForecastItem] = []
+        seen: set = set()
+        for r in records:
+            d = r.record_date
+            if d in seen or len(daily_items) >= 7:
+                continue
+            seen.add(d)
+            group = [x for x in records if x.record_date == d]
+            gm = [x.temperature for x in group if x.temperature is not None]
+            gmean = round(sum(gm) / len(gm), 1) if gm else mean_t
+            d_max = round(
+                max((x.temp_max for x in group if x.temp_max is not None), default=gmean + 3), 1
+            )
+            d_min = round(
+                min((x.temp_min for x in group if x.temp_min is not None), default=gmean - 3), 1
+            )
+            d_precip = round(sum((x.precipitation or 0.0) for x in group), 1)
+            d_wind = round(
+                max((x.wind_speed for x in group if x.wind_speed is not None), default=10.0), 1
+            )
+            d_uv = round(
+                max((x.uv_index for x in group if x.uv_index is not None), default=max(0.0, gmean - 14.0)), 1
+            )
+            d_cond = next((x.condition for x in group if x.condition), condition)
+            d_code = _condition_to_code(d_cond)
+            d_desc, d_icon = get_weather_meta(d_code, True)
+            dt_obj = datetime.strptime(str(d), "%Y-%m-%d")
+            daily_items.append(
+                DailyForecastItem(
+                    date=str(d),
+                    day_name=SPANISH_DAYS[dt_obj.weekday()],
+                    day_short=SPANISH_DAYS_SHORT[dt_obj.weekday()],
+                    temp_max=d_max,
+                    temp_min=d_min,
+                    weather_code=d_code,
+                    weather_description=d_desc,
+                    weather_icon=d_icon,
+                    precipitation_sum=d_precip,
+                    precipitation_probability_max=85 if d_precip > 0.1 else 10,
+                    uv_index_max=d_uv,
+                    wind_speed_max=d_wind,
+                    sunrise="06:00",
+                    sunset="18:00",
+                )
+            )
+
+        hourly_items: List[HourlyForecastItem] = []
+        hour_rows = [r for r in day_rows if r.hour]
+        if len(hour_rows) >= 6:
+            hour_rows.sort(key=lambda x: x.hour)
+            for r in hour_rows[:24]:
+                h_code = _condition_to_code(r.condition)
+                h_desc, h_icon = get_weather_meta(h_code, True)
+                hourly_items.append(
+                    HourlyForecastItem(
+                        time=f"{r.record_date}T{r.hour:02d}:00",
+                        hour_label=f"{r.hour:02d}:00",
+                        temperature=round(r.temperature or mean_t, 1),
+                        apparent_temperature=round(r.temperature or mean_t, 1),
+                        relative_humidity=int(r.humidity or humidity),
+                        precipitation_probability=85 if (r.precipitation or 0.0) > 0.1 else 10,
+                        precipitation=round(r.precipitation or 0.0, 1),
+                        weather_code=h_code,
+                        weather_description=h_desc,
+                        weather_icon=h_icon,
+                        wind_speed=round(r.wind_speed or wind, 1),
+                        uv_index=round(r.uv_index or uv, 1),
+                        is_day=6 <= (r.hour or 12) <= 18,
+                    )
+                )
+
+        if not hourly_items:
+            import math
+
+            for h in range(24):
+                period = math.sin(((h - 6) / 18.0) * math.pi)
+                t = temp_min + (temp_max - temp_min) * period
+                hourly_items.append(
+                    HourlyForecastItem(
+                        time=f"{latest_date}T{h:02d}:00",
+                        hour_label=f"{h:02d}:00",
+                        temperature=round(t, 1),
+                        apparent_temperature=round(t, 1),
+                        relative_humidity=int(humidity + (10 if h < 6 else -5)),
+                        precipitation_probability=85 if precip > 0.1 else 10,
+                        precipitation=round(precip / 24, 2),
+                        weather_code=weather_code,
+                        weather_description=desc,
+                        weather_icon=icon,
+                        wind_speed=wind,
+                        uv_index=max(0.0, round(uv, 1)),
+                        is_day=6 <= h <= 18,
+                    )
+                )
+
+        return FullForecastResponse(current=current, hourly=hourly_items, daily=daily_items)
+
+    @classmethod
     async def get_departments_summary(cls, db: Session) -> List[DepartmentWeatherSummary]:
         departments = db.query(Department).all()
         summaries: List[DepartmentWeatherSummary] = []
 
         for dept in departments:
+            real_row = (
+                db.query(WeatherRecord)
+                .join(City, City.id == WeatherRecord.city_id)
+                .filter(City.department_id == dept.id)
+                .order_by(WeatherRecord.record_date.desc(), WeatherRecord.id.desc())
+                .first()
+            )
+            if real_row:
+                t_val = real_row.temperature
+                cond_str = real_row.condition or "Reporte Cargado"
+                rc = _condition_to_code(cond_str)
+                r_desc, r_icon = get_weather_meta(rc, True)
+                summaries.append(DepartmentWeatherSummary(
+                    department_id=dept.id,
+                    department_name=dept.name,
+                    capital=dept.capital,
+                    latitude=dept.latitude,
+                    longitude=dept.longitude,
+                    region_natural=dept.region_natural,
+                    temperature=round(t_val or 0.0, 1),
+                    weather_description=r_desc,
+                    weather_icon=r_icon,
+                    relative_humidity=int(real_row.humidity or 0),
+                    precipitation=round(real_row.precipitation or 0.0, 1),
+                    uv_index=round(real_row.uv_index or 0.0, 1),
+                    wind_speed=round(real_row.wind_speed or 0.0, 1),
+                    data_source="real",
+                ))
+                continue
+
             try:
                 raw = await cls.fetch_open_meteo_raw(dept.latitude, dept.longitude)
                 curr = raw.get("current", {})
@@ -307,7 +546,8 @@ class WeatherService:
                     relative_humidity=int(curr.get("relative_humidity_2m", 0)),
                     precipitation=round(float(curr.get("precipitation", 0.0)), 1),
                     uv_index=round(float(uv_val), 1),
-                    wind_speed=round(float(curr.get("wind_speed_10m", 0.0)), 1)
+                    wind_speed=round(float(curr.get("wind_speed_10m", 0.0)), 1),
+                    data_source="simulado"
                 ))
             except Exception as e:
                 print(f"Error fetching summary for {dept.name}: {e}")
@@ -326,6 +566,18 @@ class WeatherService:
         city = db.query(City).filter(City.id == city_id).first()
         if not city:
             raise ValueError(f"Ciudad con ID {city_id} no encontrada.")
+
+        real_rows = (
+            db.query(WeatherRecord)
+            .filter(
+                WeatherRecord.city_id == city_id,
+                WeatherRecord.record_date >= datetime.strptime(start_date, "%Y-%m-%d").date(),
+                WeatherRecord.record_date <= datetime.strptime(end_date, "%Y-%m-%d").date(),
+            )
+            .all()
+        )
+        if real_rows:
+            return cls._history_from_records(city, real_rows, start_date, end_date, variable)
 
         url = f"{settings.OPEN_METEO_HISTORICAL_URL}/archive"
         params = {
@@ -425,7 +677,88 @@ class WeatherService:
             start_date=start_date,
             end_date=end_date,
             stats=stats,
-            data=data_points
+            data=data_points,
+            data_source="simulado"
+        )
+
+    @classmethod
+    def _history_from_records(
+        cls,
+        city: City,
+        records: List[WeatherRecord],
+        start_date: str,
+        end_date: str,
+        variable: str,
+    ) -> HistoryResponse:
+        """Construye el histórico agregando por día los registros reales del dataset."""
+        grouped: Dict[Any, List[WeatherRecord]] = {}
+        for r in records:
+            grouped.setdefault(r.record_date, []).append(r)
+
+        data_points: List[HistoryDataPoint] = []
+        val_for_stats: List[float] = []
+
+        for d in sorted(grouped.keys()):
+            group = grouped[d]
+            t_mean = round(sum((x.temperature or 0.0) for x in group) / len(group), 1)
+            t_max = round(max((x.temp_max for x in group if x.temp_max is not None), default=t_mean + 3), 1)
+            t_min = round(min((x.temp_min for x in group if x.temp_min is not None), default=t_mean - 3), 1)
+            p_sum = round(sum((x.precipitation or 0.0) for x in group), 1)
+            w_max = round(max((x.wind_speed for x in group if x.wind_speed is not None), default=10.0), 1)
+            hum_mean = int(sum((x.humidity or 0.0) for x in group) / len(group))
+            cond_val = next((x.condition for x in group if x.condition), "Reporte Cargado")
+
+            data_points.append(HistoryDataPoint(
+                date=str(d),
+                temp_max=t_max,
+                temp_min=t_min,
+                temp_mean=t_mean,
+                precipitation_sum=p_sum,
+                wind_speed_max=w_max,
+                relative_humidity_mean=hum_mean,
+                weather_code=_condition_to_code(cond_val),
+            ))
+
+            if variable == "temperature":
+                val_for_stats.append(t_mean)
+            elif variable == "precipitation":
+                val_for_stats.append(p_sum)
+            elif variable == "wind":
+                val_for_stats.append(w_max)
+            else:
+                val_for_stats.append(t_mean)
+
+        if not val_for_stats:
+            val_for_stats = [20.0]
+
+        avg_val = sum(val_for_stats) / len(val_for_stats)
+        trend = "estable"
+        if len(val_for_stats) > 3:
+            mid = len(val_for_stats) // 2
+            first_half = sum(val_for_stats[:mid]) / mid
+            second_half = sum(val_for_stats[mid:]) / (len(val_for_stats) - mid)
+            if second_half - first_half > 0.8:
+                trend = "ascendente"
+            elif first_half - second_half > 0.8:
+                trend = "descendente"
+
+        return HistoryResponse(
+            city_id=city.id,
+            city_name=city.name,
+            department_name=city.department.name,
+            variable=variable,
+            start_date=start_date,
+            end_date=end_date,
+            stats=HistoryStats(
+                average=round(avg_val, 2),
+                maximum=round(max(val_for_stats), 2),
+                minimum=round(min(val_for_stats), 2),
+                trend=trend,
+                total_precipitation=round(sum(dp.precipitation_sum or 0.0 for dp in data_points), 1),
+                days_analyzed=len(data_points),
+            ),
+            data=data_points,
+            data_source="real",
         )
 
     @classmethod
@@ -490,5 +823,6 @@ class WeatherService:
                 total_precipitation=round(sum(dp.precipitation_sum for dp in data_points), 1),
                 days_analyzed=len(data_points)
             ),
-            data=data_points
+            data=data_points,
+            data_source="simulado"
         )

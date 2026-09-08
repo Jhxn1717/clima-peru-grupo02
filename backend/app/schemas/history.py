@@ -28,3 +28,4 @@ class HistoryResponse(BaseModel):
     end_date: str
     stats: HistoryStats
     data: List[HistoryDataPoint]
+    data_source: str = "simulado"  # "real" (dataset CSV) | "simulado" (API/fallback)

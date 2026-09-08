@@ -53,6 +53,7 @@ export interface CurrentWeather {
   altitude?: number | null;
   latitude: number;
   longitude: number;
+  data_source?: 'real' | 'simulado' | string;
 }
 
 export interface HourlyForecastItem {
@@ -108,6 +109,7 @@ export interface DepartmentWeatherSummary {
   precipitation: number;
   uv_index: number;
   wind_speed: number;
+  data_source?: 'real' | 'simulado' | string;
 }
 
 export interface WeatherAlert {
@@ -190,6 +192,7 @@ export interface HistoryResponse {
   end_date: string;
   stats: HistoryStats;
   data: HistoryDataPoint[];
+  data_source?: 'real' | 'simulado' | string;
 }
 
 export interface NationalRankings {

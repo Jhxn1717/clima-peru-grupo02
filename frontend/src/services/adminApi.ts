@@ -64,4 +64,18 @@ export const adminApi = {
     });
     return handle<{ message: string }>(res);
   },
+
+  async importDataset(file: File): Promise<any> {
+    const token = authStorage.getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${API_BASE}/admin/dataset/import`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    return handle<any>(res);
+  },
 };

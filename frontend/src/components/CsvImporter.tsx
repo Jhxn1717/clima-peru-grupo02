@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import {
   UploadCloud,
   FileSpreadsheet,
@@ -13,28 +13,90 @@ import {
   CloudRain,
   Sparkles,
   Loader2,
-  Eye
+  Eye,
+  Database
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, Line,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend
 } from 'recharts';
 import { weatherApi } from '../services/api';
+import { adminApi } from '../services/adminApi';
+import { authStorage } from '../services/authApi';
+
+const CHUNK_SIZE = 3000;
+const MAX_CHART_POINTS = 500;
+const MAX_RENDERED = 1000;
+const LARGE_FILE_SIZE = 1024 * 1024;
+
+// Caché de módulo: sobrevive al desmontaje de la pestaña para que el dataset
+// importado (y su archivo) no se pierdan al cambiar de pestaña.
+const csvSession: {
+  importResult: any | null;
+  lastFile: File | null;
+  saveStatus: string | null;
+  saveHasError: boolean;
+} = {
+  importResult: null,
+  lastFile: null,
+  saveStatus: null,
+  saveHasError: false,
+};
 
 interface CsvImporterProps {
   theme?: 'dark' | 'light';
+  onDatasetSaved?: () => void;
 }
 
-export const CsvImporter: React.FC<CsvImporterProps> = ({ theme = 'dark' }) => {
+export const CsvImporter: React.FC<CsvImporterProps> = ({ theme = 'dark', onDatasetSaved }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [importResult, setImportResult] = useState<any | null>(null);
+  const [importResult, setImportResult] = useState<any | null>(csvSession.importResult);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState<number>(25);
   const [chartMode, setChartMode] = useState<'all' | 'sampled'>('all');
+  const [lastFile, setLastFile] = useState<File | null>(csvSession.lastFile);
+  const [isSavingDataset, setIsSavingDataset] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<string | null>(csvSession.saveStatus);
+  const [saveHasError, setSaveHasError] = useState<boolean>(csvSession.saveHasError);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isAdmin = authStorage.getUser()?.role === 'admin';
+
+  // Sincroniza la caché de módulo en cada cambio de estado
+  useEffect(() => {
+    csvSession.importResult = importResult;
+  }, [importResult]);
+  useEffect(() => {
+    csvSession.lastFile = lastFile;
+  }, [lastFile]);
+  useEffect(() => {
+    csvSession.saveStatus = saveStatus;
+    csvSession.saveHasError = saveHasError;
+  }, [saveStatus, saveHasError]);
+
+  // Guarda el dataset real del archivo subido en la tabla weather_records
+  const saveToDatabase = async () => {
+    if (!lastFile) return;
+    setIsSavingDataset(true);
+    setSaveStatus(null);
+    setSaveHasError(false);
+    try {
+      const res = await adminApi.importDataset(lastFile);
+      const detail =
+        res.unmatched_stations?.length > 0
+          ? ` Estaciones sin vincular: ${res.unmatched_stations.join(', ')}`
+          : '';
+      setSaveStatus(`${res.message}${detail}`);
+      onDatasetSaved?.();
+    } catch (err: any) {
+      setSaveStatus(`Error: ${err.message || 'No se pudo guardar el dataset en la base de datos.'}`);
+      setSaveHasError(true);
+    } finally {
+      setIsSavingDataset(false);
+    }
+  };
 
   // Datasets de prueba predefinidos para carga instantánea
   const loadDemoData = (station: 'lima' | 'cusco' | 'iquitos') => {
@@ -123,12 +185,18 @@ export const CsvImporter: React.FC<CsvImporterProps> = ({ theme = 'dark' }) => {
       },
       data: rows
     });
+    setChartMode('all');
     setError(null);
     setCurrentPage(1);
   };
 
   // Parser local completo que lee el 100% de todas las filas del archivo
-  const parseLocalCsv = (text: string, filename: string) => {
+  const parseLocalCsv = async (
+    text: string,
+    filename: string,
+    serverMessage?: string | null,
+    serverStats?: any
+  ) => {
     const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
     if (lines.length < 2) {
       throw new Error('El archivo CSV no contiene suficientes registros.');
@@ -136,72 +204,147 @@ export const CsvImporter: React.FC<CsvImporterProps> = ({ theme = 'dark' }) => {
 
     const delimiter = lines[0].includes(';') ? ';' : ',';
 
+    let headerIndex = 0;
+    const colMap: Record<string, number> = {};
+    const headerHints = ['fecha', 'date', 'hora', 'time', 'temp', 'temperatura', 'ciudad', 'city', 'departamento'];
+    for (let i = 0; i < Math.min(15, lines.length); i++) {
+      const joined = lines[i].split(delimiter).join(' ').toLowerCase();
+      if (headerHints.some(k => joined.includes(k))) {
+        headerIndex = i;
+        lines[i].split(delimiter).forEach((rawCol, idx) => {
+          const norm = rawCol.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+          const set = (key: string) => { if (colMap[key] === undefined) colMap[key] = idx; };
+          if (/fecha|date|time|hora|dia/.test(norm)) set('date');
+          else if (/ciudad|city|estacion|location/.test(norm)) set('city');
+          else if (/departamento|department|region/.test(norm)) set('department');
+          else if (/provincia|province/.test(norm)) set('province');
+          else if (/temp_max|maxima|tmax/.test(norm)) set('temp_max');
+          else if (/temp_min|minima|tmin/.test(norm)) set('temp_min');
+          else if (/temp_mean|media|tmean|temp|temperatura/.test(norm)) set('temperature');
+          else if (/hum|humedad|relative_humidity/.test(norm)) set('humidity');
+          else if (/precip|precipitacion|lluvia|rain/.test(norm)) set('precipitation');
+          else if (/viento|wind|speed|velocidad/.test(norm)) set('wind_speed');
+          else if (/uv|indice_uv/.test(norm)) set('uv_index');
+          else if (/condicion|condition|descripcion|clima|weather/.test(norm)) set('condition');
+        });
+        break;
+      }
+    }
+
     const data: any[] = [];
     const temps: number[] = [];
     const precips: number[] = [];
     const winds: number[] = [];
+    const uvs: number[] = [];
+    const cities = new Set<string>();
+    const dates: string[] = [];
 
-    // Procesa el 100% de las filas del archivo sin cortes
-    for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(delimiter).map(c => c.trim().replace(/^"|"$/g, ''));
-      if (cols.length < 2) continue;
+    const cleanFloat = (raw: string | undefined, fallback?: number): number | null => {
+      if (raw === undefined || raw.trim() === '') return fallback ?? null;
+      const parsed = parseFloat(raw.replace('°C', '').replace('°', '').replace('km/h', '').replace('%', '').replace('mm', '').replace(',', '.'));
+      return isNaN(parsed) ? (fallback ?? null) : Math.round(parsed * 100) / 100;
+    };
 
-      const temp = parseFloat(cols[3] || cols[1] || '20.0') || 20.0;
-      const rain = parseFloat(cols[7] || cols[4] || '0.0') || 0.0;
-      const wind = parseFloat(cols[8] || cols[5] || '10.0') || 10.0;
+    let rowId = 0;
+
+    const processRow = (line: string) => {
+      const cols = line.split(delimiter).map(c => c.trim().replace(/^"|"$/g, ''));
+      if (cols.length < 2 || !cols.some(c => c !== '')) return;
+      if (/---|reporte de/.test(line.toLowerCase())) return;
+
+      const get = (key: string) => (colMap[key] !== undefined && colMap[key] < cols.length ? cols[colMap[key]] : undefined);
+
+      const rawTemp = cleanFloat(get('temperature'));
+      const tempMax = cleanFloat(get('temp_max'));
+      const tempMin = cleanFloat(get('temp_min'));
+      const fallbackTemp = tempMax !== null && tempMin !== null ? Math.round(((tempMax + tempMin) / 2) * 10) / 10 : 20.0;
+      const temp = rawTemp === null ? fallbackTemp : rawTemp;
+      const humidity = cleanFloat(get('humidity'), 75) ?? 75;
+      const rain = cleanFloat(get('precipitation'), 0.0) ?? 0.0;
+      const wind = cleanFloat(get('wind_speed'), 10.0) ?? 10.0;
+      const uv = cleanFloat(get('uv_index'), 7) ?? 7;
+
+      rowId += 1;
+
+      const dateVal = get('date') || `Fila ${rowId}`;
+      const cityVal = get('city') || 'Perú';
+      const deptVal = get('department') || '';
+      const provVal = get('province') || '';
 
       temps.push(temp);
       precips.push(rain);
       winds.push(wind);
+      uvs.push(uv);
+      if (cityVal && cityVal !== 'Perú') cities.add(cityVal);
+      if (dateVal) dates.push(dateVal);
 
       data.push({
-        id: data.length + 1,
-        date: cols[0] || `Fila ${i}`,
-        city: cols[1] || 'Perú',
-        department: cols[2] || 'Nacional',
+        id: rowId,
+        date: dateVal,
+        city: cityVal,
+        department: deptVal,
+        province: provVal,
         temperature: temp,
-        temp_min: Math.round((temp - 3) * 10) / 10,
-        temp_max: Math.round((temp + 3) * 10) / 10,
-        humidity: parseFloat(cols[6] || '75') || 75,
+        temp_min: tempMin ?? Math.round((temp - 3) * 10) / 10,
+        temp_max: tempMax ?? Math.round((temp + 3) * 10) / 10,
+        humidity,
         precipitation: rain,
         wind_speed: wind,
-        uv_index: parseFloat(cols[9] || '7') || 7,
-        condition: cols[10] || 'Dato Registrado'
+        uv_index: uv,
+        condition: get('condition') || 'Dato Registrado'
       });
+    };
+
+    for (let i = headerIndex + 1; i < lines.length; i++) {
+      processRow(lines[i]);
+      if (i % CHUNK_SIZE === 0) {
+        await new Promise<void>(r => setTimeout(r, 0));
+      }
     }
 
     if (data.length === 0) {
       throw new Error('No se pudieron interpretar registros válidos en el archivo.');
     }
 
+    const avg = (arr: number[]) =>
+      arr.length ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : 0;
+
+    const localStats = {
+      total_records: data.length,
+      filename,
+      detected_city: data[0]?.city || 'Perú',
+      all_cities: Array.from(cities),
+      start_date: dates[0] || '-',
+      end_date: dates[dates.length - 1] || '-',
+      temperature: {
+        average: avg(temps),
+        max: temps.length ? Math.max(...temps) : 0,
+        min: temps.length ? Math.min(...temps) : 0
+      },
+      precipitation: {
+        total: Math.round(precips.reduce((a, b) => a + b, 0) * 10) / 10,
+        max_single_day: precips.length ? Math.max(...precips) : 0,
+        rainy_days: precips.filter(p => p > 0.1).length
+      },
+      wind: {
+        average: avg(winds),
+        max: winds.length ? Math.max(...winds) : 0
+      },
+      uv: {
+        average: avg(uvs),
+        max: uvs.length ? Math.max(...uvs) : 0
+      }
+    };
+
+    const useServerStats = serverStats && serverStats.total_records === data.length;
+
     setImportResult({
       success: true,
-      message: `Archivo procesado con éxito: ${data.length} registros cargados al 100% (${filename})`,
-      stats: {
-        total_records: data.length,
-        filename,
-        detected_city: data[0]?.city || 'Perú',
-        all_cities: [data[0]?.city || 'Perú'],
-        start_date: data[0]?.date || '-',
-        end_date: data[data.length - 1]?.date || '-',
-        temperature: {
-          average: temps.length ? Math.round((temps.reduce((a, b) => a + b, 0) / temps.length) * 10) / 10 : 0,
-          max: temps.length ? Math.max(...temps) : 0,
-          min: temps.length ? Math.min(...temps) : 0
-        },
-        precipitation: {
-          total: precips.length ? Math.round(precips.reduce((a, b) => a + b, 0) * 10) / 10 : 0,
-          max_single_day: precips.length ? Math.max(...precips) : 0,
-          rainy_days: precips.filter(p => p > 0.1).length
-        },
-        wind: {
-          average: winds.length ? Math.round((winds.reduce((a, b) => a + b, 0) / winds.length) * 10) / 10 : 0,
-          max: winds.length ? Math.max(...winds) : 0
-        },
-        uv: { average: 7, max: 9 }
-      },
+      message: serverMessage || `Archivo procesado con éxito: ${data.length} registros cargados al 100% (${filename})`,
+      stats: useServerStats ? serverStats : localStats,
       data
     });
+    setChartMode(data.length > 60 ? 'sampled' : 'all');
     setError(null);
   };
 
@@ -214,21 +357,30 @@ export const CsvImporter: React.FC<CsvImporterProps> = ({ theme = 'dark' }) => {
 
     setIsUploading(true);
     setError(null);
+    setLastFile(file);
 
     try {
-      // Intenta procesar con la API Backend
-      const result = await weatherApi.importCsv(file);
-      setImportResult(result);
+      const text = await file.text();
+
+      let serverMessage: string | null = null;
+      let serverStats: any = null;
+
+      if (file.size <= LARGE_FILE_SIZE) {
+        try {
+          const result = await weatherApi.importCsv(file);
+          if (result?.stats) {
+            serverMessage = result.message || null;
+            serverStats = result.stats;
+          }
+        } catch (err) {
+          console.warn('API backend no disponible, procesando 100% de los datos localmente:', err);
+        }
+      }
+
+      await parseLocalCsv(text, file.name, serverMessage, serverStats);
       setCurrentPage(1);
     } catch (err: any) {
-      console.warn('API backend no disponible o timeout, procesando 100% de los datos localmente:', err);
-      try {
-        const text = await file.text();
-        parseLocalCsv(text, file.name);
-        setCurrentPage(1);
-      } catch (localErr: any) {
-        setError(localErr.message || 'Error al procesar el archivo CSV. Verifica el formato o descarga la plantilla.');
-      }
+      setError(err.message || 'Error al procesar el archivo CSV. Verifica el formato o descarga la plantilla.');
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
@@ -257,11 +409,11 @@ export const CsvImporter: React.FC<CsvImporterProps> = ({ theme = 'dark' }) => {
   // Gráficos: Permite ver todos los puntos (100% del archivo) o vista suavizada
   const chartData = useMemo(() => {
     if (!importResult?.data || importResult.data.length === 0) return [];
-    if (chartMode === 'all' || importResult.data.length <= 60) {
-      return importResult.data;
-    }
-    const step = Math.ceil(importResult.data.length / 50);
-    return importResult.data.filter((_: any, idx: number) => idx % step === 0);
+    const source = importResult.data;
+    const maxPoints = chartMode === 'all' ? Math.min(MAX_CHART_POINTS, source.length) : 50;
+    if (source.length <= maxPoints) return source;
+    const step = Math.ceil(source.length / maxPoints);
+    return source.filter((_: any, idx: number) => idx % step === 0);
   }, [importResult, chartMode]);
 
   // Filtrado de filas en la tabla
@@ -277,12 +429,11 @@ export const CsvImporter: React.FC<CsvImporterProps> = ({ theme = 'dark' }) => {
     );
   }, [importResult, searchQuery]);
 
-  const effectiveRowsPerPage = rowsPerPage === 0 ? filteredData.length : rowsPerPage;
+  const effectiveRowsPerPage = rowsPerPage === 0 ? Math.max(1, Math.min(filteredData.length, MAX_RENDERED)) : rowsPerPage;
   const totalPages = Math.max(1, Math.ceil(filteredData.length / effectiveRowsPerPage));
   const paginatedData = useMemo(() => {
-    if (rowsPerPage === 0) return filteredData;
-    return filteredData.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
-  }, [filteredData, currentPage, rowsPerPage]);
+    return filteredData.slice((currentPage - 1) * effectiveRowsPerPage, currentPage * effectiveRowsPerPage);
+  }, [filteredData, currentPage, effectiveRowsPerPage]);
 
   return (
     <div className="glass-panel p-6 sm:p-8 rounded-3xl space-y-8">
@@ -401,21 +552,56 @@ export const CsvImporter: React.FC<CsvImporterProps> = ({ theme = 'dark' }) => {
           
           {/* Status Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs shadow-sm">
-            <div className="flex items-center gap-2 font-semibold">
+            <div className="flex flex-wrap items-center gap-2 font-semibold">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span>{importResult.message}</span>
             </div>
-            <button
-              onClick={() => {
-                setImportResult(null);
-                setError(null);
-              }}
-              className="flex items-center gap-1 text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 font-medium transition-colors self-start sm:self-auto"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Limpiar dataset</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+              {isAdmin && lastFile && (
+                <button
+                  onClick={saveToDatabase}
+                  disabled={isSavingDataset}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border font-semibold transition-all ${
+                    isSavingDataset
+                      ? 'border-slate-300 dark:border-slate-700 text-slate-400 cursor-not-allowed'
+                      : 'border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                  }`}
+                  title="Sube este archivo como los datos reales que alimentan todo el sistema"
+                >
+                  {isSavingDataset ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Database className="w-3.5 h-3.5" />
+                  )}
+                  <span>{isSavingDataset ? 'Guardando en la base de datos real...' : 'Guardar en Base de Datos Real'}</span>
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setImportResult(null);
+                  setLastFile(null);
+                  setError(null);
+                  setSaveStatus(null);
+                  setSaveHasError(false);
+                }}
+                className="flex items-center gap-1 text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 font-medium transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Limpiar dataset</span>
+              </button>
+            </div>
           </div>
+
+          {/* Save Status Message */}
+          {saveStatus && (
+            <div className={`p-3 rounded-2xl border text-xs ${
+              saveHasError
+                ? 'border-red-500/30 bg-red-500/5 text-red-700 dark:text-red-300'
+                : 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300'
+            }`}>
+              {saveStatus}
+            </div>
+          )}
 
           {/* Stats Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
@@ -489,7 +675,7 @@ export const CsvImporter: React.FC<CsvImporterProps> = ({ theme = 'dark' }) => {
                       : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
-                  Todos los datos ({importResult.data.length} pts)
+                  Todos los datos
                 </button>
                 {importResult.data.length > 50 && (
                   <button
@@ -596,7 +782,7 @@ export const CsvImporter: React.FC<CsvImporterProps> = ({ theme = 'dark' }) => {
                     <option value={25}>25</option>
                     <option value={50}>50</option>
                     <option value={100}>100</option>
-                    <option value={0}>Todos ({importResult.data.length})</option>
+                    <option value={0}>{importResult.data.length <= MAX_RENDERED ? `Todos (${importResult.data.length})` : `Todos (${MAX_RENDERED} por página)`}</option>
                   </select>
                 </div>
 
@@ -641,14 +827,14 @@ export const CsvImporter: React.FC<CsvImporterProps> = ({ theme = 'dark' }) => {
                       className="hover:bg-slate-100/60 dark:hover:bg-slate-800/40 transition-colors"
                     >
                       <td className="py-2.5 px-4 text-slate-400 font-mono text-[11px]">
-                        {rowsPerPage === 0 ? idx + 1 : (currentPage - 1) * rowsPerPage + idx + 1}
+                        {(currentPage - 1) * effectiveRowsPerPage + idx + 1}
                       </td>
                       <td className="py-2.5 px-4 font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">
                         {row.date}
                       </td>
                       <td className="py-2.5 px-4 text-slate-700 dark:text-slate-300">
                         <div className="font-medium">{row.city}</div>
-                        {row.department && <div className="text-[10px] text-slate-400">{row.department}</div>}
+                        {row.department && <div className="text-[10px] text-slate-400">{row.department}{row.province ? ` · ${row.province}` : ''}</div>}
                       </td>
                       <td className="py-2.5 px-4 text-center font-bold text-amber-600 dark:text-amber-400">
                         {row.temperature !== null ? `${row.temperature}°C` : '-'}
@@ -688,7 +874,7 @@ export const CsvImporter: React.FC<CsvImporterProps> = ({ theme = 'dark' }) => {
             </div>
 
             {/* Pagination Controls */}
-            {rowsPerPage > 0 && totalPages > 1 && (
+            {totalPages > 1 && (
               <div className="flex items-center justify-between pt-2 text-xs">
                 <span className="text-slate-500 dark:text-slate-400">
                   Página {currentPage} de {totalPages} ({filteredData.length} registros totales)

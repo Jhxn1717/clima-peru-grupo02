@@ -13,6 +13,8 @@ import { RankingsSection } from './components/RankingsSection';
 import { CsvImporter } from './components/CsvImporter';
 import { SkeletonLoader } from './components/SkeletonLoader';
 import { Footer } from './components/Footer';
+import { PortalHome } from './components/PortalHome';
+import { projects, PORTAL_ACTIVE_KEY } from './data/projects';
 import { AuthProvider } from './context/AuthContext';
 import { AuthModal } from './components/Auth/AuthModal';
 import { AdminPanel } from './components/Admin/AdminPanel';
@@ -35,7 +37,8 @@ import {
   Lock,
   ArrowRight,
   Sun,
-  Moon
+  Moon,
+  LayoutGrid
 } from 'lucide-react';
 
 const AppInner: React.FC = () => {
@@ -56,7 +59,35 @@ const AppInner: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
+  const [isPortal, setIsPortal] = useState<boolean>(() => {
+    try {
+      const stored = sessionStorage.getItem(PORTAL_ACTIVE_KEY);
+      return !stored || !projects.some((p) => p.id === stored && p.status === 'active');
+    } catch {
+      return true;
+    }
+  });
   const { isAdmin, isAuthenticated } = useAuth();
+
+  const openProject = (projectId: string) => {
+    try {
+      sessionStorage.setItem(PORTAL_ACTIVE_KEY, projectId);
+    } catch {
+      /* noop */
+    }
+    setIsPortal(false);
+    window.scrollTo(0, 0);
+  };
+
+  const backToPortal = () => {
+    try {
+      sessionStorage.removeItem(PORTAL_ACTIVE_KEY);
+    } catch {
+      /* noop */
+    }
+    setIsPortal(true);
+    window.scrollTo(0, 0);
+  };
 
   // Guard: si se intenta acceder al panel admin sin ser admin, volver al dashboard
   useEffect(() => {
@@ -124,6 +155,13 @@ const AppInner: React.FC = () => {
     loadGlobalOverview();
   }, [loadGlobalOverview]);
 
+  //Refresca el overview (mapa/dashboard) al volver a la pestaña Mapa
+  useEffect(() => {
+    if (activeTab === 'map') {
+      loadGlobalOverview();
+    }
+  }, [activeTab, loadGlobalOverview]);
+
   // Load weather for selected city
   const loadCityWeather = useCallback(async (city: City, showRefreshing: boolean = false) => {
     if (showRefreshing) setIsRefreshing(true);
@@ -147,6 +185,14 @@ const AppInner: React.FC = () => {
       loadCityWeather(selectedCity);
     }
   }, [selectedCity, loadCityWeather]);
+
+  // Después de guardar el dataset real, refresca overview + pronóstico seleccionado
+  const handleDatasetSaved = useCallback(async () => {
+    loadGlobalOverview();
+    if (selectedCity) {
+      loadCityWeather(selectedCity, true);
+    }
+  }, [loadGlobalOverview, loadCityWeather, selectedCity]);
 
   // Handle City Selection
   const handleSelectCity = (city: City) => {
@@ -212,13 +258,24 @@ const AppInner: React.FC = () => {
     }
   };
 
-  // Export forecast as PDF
+  // Export forecast as PDF (open in new tab as preview)
   const handleExportForecast = () => {
+    const openPdfPreview = (data: FullForecastResponse) => {
+      try {
+        const { blob } = generateWeatherReportPdf(data, selectedCity);
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } catch (err) {
+        console.error('Error al generar el reporte PDF:', err);
+      }
+    };
+
     if (forecast) {
-      generateWeatherReportPdf(forecast, selectedCity);
+      openPdfPreview(forecast);
     } else if (selectedCity) {
       weatherApi.getForecast(selectedCity.id).then((data) => {
-        generateWeatherReportPdf(data, selectedCity);
+        openPdfPreview(data);
       });
     }
   };
@@ -228,6 +285,14 @@ const AppInner: React.FC = () => {
     'Lima', 'Arequipa', 'Cusco', 'Piura', 'Trujillo',
     'Chiclayo', 'Iquitos', 'Huancayo', 'Puno', 'Tacna', 'Chimbote'
   ];
+
+  if (isPortal) {
+    return (
+      <PortalHome
+        onOpenProject={openProject}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-100 text-slate-800 dark:bg-slate-950 dark:text-slate-100 selection:bg-sky-500 selection:text-white transition-colors duration-300">
@@ -256,6 +321,14 @@ const AppInner: React.FC = () => {
           {/* Top Brand Bar */}
           <header className="relative z-10 w-full max-w-6xl mx-auto flex items-center justify-between py-2">
             <div className="flex items-center gap-3">
+              <button
+                onClick={backToPortal}
+                title="Volver al Portal de Proyectos"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold backdrop-blur-md transition-all shadow-sm"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Portal</span>
+              </button>
               <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-red-600 via-rose-500 to-sky-500 p-0.5 shadow-xl shadow-sky-500/20">
                 <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center">
                   <span className="text-base font-black text-white">PE</span>
@@ -390,6 +463,7 @@ const AppInner: React.FC = () => {
         theme={theme}
         onToggleTheme={toggleTheme}
         onOpenAuth={() => setIsAuthOpen(true)}
+        onBackToPortal={backToPortal}
       />
 
       {/* Main Container */}
@@ -492,7 +566,7 @@ const AppInner: React.FC = () => {
         )}
 
         {activeTab === 'csv' && (
-          <CsvImporter theme={theme} />
+          <CsvImporter theme={theme} onDatasetSaved={handleDatasetSaved} />
         )}
 
         {activeTab === 'admin' && isAdmin && (

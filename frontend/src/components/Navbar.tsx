@@ -17,7 +17,8 @@ import {
   LogIn,
   LogOut,
   UserRound,
-  Settings
+  Settings,
+  LayoutGrid
 } from 'lucide-react';
 import { City } from '../types/weather';
 import { ThemeSwitch } from './ThemeSwitch';
@@ -37,6 +38,7 @@ interface NavbarProps {
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
   onOpenAuth: () => void;
+  onBackToPortal?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -52,7 +54,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onExportForecast,
   theme,
   onToggleTheme,
-  onOpenAuth
+  onOpenAuth,
+  onBackToPortal
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -132,6 +135,16 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20 gap-3 sm:gap-4">
           
+          {onBackToPortal && (
+            <button
+              onClick={onBackToPortal}
+              title="Volver al Portal de Proyectos"
+              className="p-2 rounded-xl bg-white/90 hover:bg-slate-100 dark:bg-slate-900/80 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700/60 text-slate-600 dark:text-slate-300 hover:text-sky-600 dark:hover:text-sky-400 shadow-sm transition-colors shrink-0"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+          )}
+
           {/* Logo & Brand */}
           <div className="flex items-center gap-3 cursor-pointer select-none shrink-0" onClick={() => setActiveTab('dashboard')}>
             <div className="relative flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-tr from-red-600 via-rose-500 to-sky-500 p-0.5 shadow-lg shadow-sky-500/20">
