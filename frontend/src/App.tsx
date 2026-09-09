@@ -14,6 +14,7 @@ import { CsvImporter } from './components/CsvImporter';
 import { SkeletonLoader } from './components/SkeletonLoader';
 import { Footer } from './components/Footer';
 import { PortalHome } from './components/PortalHome';
+import { PdfPreviewModal } from './components/PdfPreviewModal';
 import { projects, PORTAL_ACTIVE_KEY } from './data/projects';
 import { AuthProvider } from './context/AuthContext';
 import { AuthModal } from './components/Auth/AuthModal';
@@ -59,6 +60,7 @@ const AppInner: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
+  const [pdfPreview, setPdfPreview] = useState<{ blob: Blob; filename: string } | null>(null);
   const [isPortal, setIsPortal] = useState<boolean>(() => {
     try {
       const stored = sessionStorage.getItem(PORTAL_ACTIVE_KEY);
@@ -258,14 +260,12 @@ const AppInner: React.FC = () => {
     }
   };
 
-  // Export forecast as PDF (open in new tab as preview)
+  // Export forecast as PDF (preview in modal with download button)
   const handleExportForecast = () => {
     const openPdfPreview = (data: FullForecastResponse) => {
       try {
-        const { blob } = generateWeatherReportPdf(data, selectedCity);
-        const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        const { blob, filename } = generateWeatherReportPdf(data, selectedCity);
+        setPdfPreview({ blob, filename });
       } catch (err) {
         console.error('Error al generar el reporte PDF:', err);
       }
@@ -580,6 +580,15 @@ const AppInner: React.FC = () => {
 
       {/* Auth Modal */}
       <AuthModal open={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
+
+      {/* PDF Preview Modal */}
+      {pdfPreview && (
+        <PdfPreviewModal
+          blob={pdfPreview.blob}
+          filename={pdfPreview.filename}
+          onClose={() => setPdfPreview(null)}
+        />
+      )}
         </>
       )}
 

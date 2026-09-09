@@ -117,8 +117,20 @@ export const RankingsSection: React.FC<RankingsSectionProps> = ({ onSelectCityBy
                   <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black border ${medalColor}`}>
                     #{rank}
                   </span>
-                  <div className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-900/80 shadow-sm">
-                    <WeatherIcon name={item.weather_icon} size={20} />
+                  <div className="flex items-center gap-1.5">
+                    {item.data_source === 'real' && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">
+                        Reales
+                      </span>
+                    )}
+                    {item.data_source === 'simulado' && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30">
+                        Simulado
+                      </span>
+                    )}
+                    <div className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-900/80 shadow-sm">
+                      <WeatherIcon name={item.weather_icon} size={20} />
+                    </div>
                   </div>
                 </div>
 
