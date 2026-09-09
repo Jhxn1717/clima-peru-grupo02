@@ -21,6 +21,7 @@ class User(Base):
     full_name = Column(String(120), nullable=False)
     email = Column(String(255), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
+    avatar_url = Column(String(500), nullable=True, default=None)
     is_verified = Column(Boolean, default=False, nullable=False)
     role = Column(String(20), default="user", nullable=False)  # 'admin' | 'user'
     created_at = Column(DateTime(timezone=True), server_default=func.now())

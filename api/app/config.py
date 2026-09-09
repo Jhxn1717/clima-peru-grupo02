@@ -11,7 +11,9 @@ except ImportError:
 
 # Detectar entorno serverless de Vercel o Linux read-only
 is_serverless = os.getenv("VERCEL") == "1" or (os.path.exists("/tmp") and os.name != "nt")
-default_db_url = "sqlite:////tmp/clima_peru.db" if is_serverless else "sqlite:///./clima_peru.db"
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+default_sqlite_path = os.path.join(backend_dir, "clima_peru.db").replace("\\", "/")
+default_db_url = "sqlite:////tmp/clima_peru.db" if is_serverless else f"sqlite:///{default_sqlite_path}"
 
 def _get_cors_origins() -> list:
     raw = os.getenv("CORS_ORIGINS", "*")
@@ -33,12 +35,17 @@ class Settings:
     OPEN_METEO_BASE_URL: str = "https://api.open-meteo.com/v1"
     OPEN_METEO_HISTORICAL_URL: str = "https://archive-api.open-meteo.com/v1"
     CORS_ORIGINS: list = _get_cors_origins()
+    # Enable or disable email verification (default true)
+    EMAIL_VERIFICATION_ENABLED: bool = os.getenv("EMAIL_VERIFICATION_ENABLED", "true").lower() == "true"
 
-    # Autenticación (JWT)
+    # Autenticación (JWT & Google)
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "clave-super-secreta-de-desarrollo-cambiar-en-produccion")
     JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRE_MINUTES: int = int(os.getenv("JWT_EXPIRE_MINUTES", 60))
+    JWT_EXPIRE_MINUTES: int = int(os.getenv("JWT_EXPIRE_MINUTES", 1440))
     VERIFICATION_CODE_EXPIRE_MINUTES: int = int(os.getenv("VERIFICATION_CODE_EXPIRE_MINUTES", 15))
+    GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+
 
     # SMTP / Email (verificación por correo)
     SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")

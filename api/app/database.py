@@ -8,6 +8,12 @@ db_url = settings.DATABASE_URL
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
 
+# Ensure sslmode=require for remote postgres if not specified
+if db_url.startswith("postgresql://") and "localhost" not in db_url and "127.0.0.1" not in db_url:
+    if "sslmode=" not in db_url:
+        separator = "&" if "?" in db_url else "?"
+        db_url = f"{db_url}{separator}sslmode=require"
+
 is_sqlite = db_url.startswith("sqlite")
 
 # Ensure /tmp SQLite database exists on Serverless

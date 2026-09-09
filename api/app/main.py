@@ -18,10 +18,20 @@ from app.routers import (
     admin
 )
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Inicializar tablas y datos del Perú si no existen
+    try:
+        init_db_and_seed()
+    except Exception as e:
+        print(f"Advertencia al inicializar base de datos en startup: {e}")
+    yield
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="API REST para el Sistema Web de Clima y Datos Meteorológicos del Perú. Integra Open-Meteo, catálogos geográficos del Perú, pronósticos, comparador, análisis histórico y alertas climáticas."
+    description="API REST para el Sistema Web de Clima y Datos Meteorológicos del Perú. Integra Open-Meteo, catálogos geográficos del Perú, pronósticos, comparador, análisis histórico y alertas climáticas.",
+    lifespan=lifespan
 )
 
 # CORS configuration
@@ -60,4 +70,11 @@ def root():
 @app.get("/health")
 def health_check():
     return {"status": "healthy", "service": "clima-peru-api"}
+
+# Inicializar tablas y datos geográficos automáticamente al arrancar
+try:
+    init_db_and_seed()
+except Exception as e:
+    print(f"[DB-INIT-WARNING] No se pudo auto-inicializar la BD: {e}")
+
 

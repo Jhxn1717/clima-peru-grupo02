@@ -71,3 +71,10 @@ def root():
 def health_check():
     return {"status": "healthy", "service": "clima-peru-api"}
 
+# Inicializar tablas y datos geográficos automáticamente al arrancar
+try:
+    init_db_and_seed()
+except Exception as e:
+    print(f"[DB-INIT-WARNING] No se pudo auto-inicializar la BD: {e}")
+
+

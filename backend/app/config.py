@@ -35,6 +35,8 @@ class Settings:
     OPEN_METEO_BASE_URL: str = "https://api.open-meteo.com/v1"
     OPEN_METEO_HISTORICAL_URL: str = "https://archive-api.open-meteo.com/v1"
     CORS_ORIGINS: list = _get_cors_origins()
+    # Enable or disable email verification (default true)
+    EMAIL_VERIFICATION_ENABLED: bool = os.getenv("EMAIL_VERIFICATION_ENABLED", "true").lower() == "true"
 
     # Autenticación (JWT & Google)
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "clave-super-secreta-de-desarrollo-cambiar-en-produccion")
