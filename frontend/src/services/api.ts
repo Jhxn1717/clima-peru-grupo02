@@ -104,6 +104,13 @@ export const weatherApi = {
     return res.json();
   },
 
+  // Real CSV dataset (registros reales guardados en weather_records)
+  async getRealDataset(limit: number = 10000): Promise<{ count: number; records: any[] }> {
+    const res = await fetch(`${API_BASE}/weather/dataset?limit=${limit}`);
+    if (!res.ok) throw new Error('Error al consultar el dataset real guardado');
+    return res.json();
+  },
+
   // Export CSV download URL
   getExportCsvUrl(cityId: number, exportType: 'forecast' | 'history' = 'forecast', days: number = 30): string {
     return `${API_BASE}/export/csv?city_id=${cityId}&export_type=${exportType}&days=${days}`;

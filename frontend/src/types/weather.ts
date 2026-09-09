@@ -156,6 +156,7 @@ export interface CityComparisonItem {
   weather_description: string;
   weather_icon: string;
   surface_pressure: number;
+  data_source?: 'real' | 'simulado' | string;
 }
 
 export interface CompareResponse {

@@ -54,7 +54,8 @@ async def compare_cities(
                 temp_min=curr.temp_min,
                 weather_description=curr.weather_description,
                 weather_icon=curr.weather_icon,
-                surface_pressure=curr.surface_pressure
+                surface_pressure=curr.surface_pressure,
+                data_source=curr.data_source
             ))
         except Exception as e:
             print(f"Error fetching compare data for {c.name}: {e}")

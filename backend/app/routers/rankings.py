@@ -36,7 +36,8 @@ async def get_national_rankings(db: Session = Depends(get_db)) -> Dict[str, Any]
                 "wind_speed": curr.wind_speed,
                 "relative_humidity": curr.relative_humidity,
                 "weather_description": curr.weather_description,
-                "weather_icon": curr.weather_icon
+                "weather_icon": curr.weather_icon,
+                "data_source": curr.data_source
             })
         except Exception as e:
             print(f"Error rank for {c.name}: {e}")

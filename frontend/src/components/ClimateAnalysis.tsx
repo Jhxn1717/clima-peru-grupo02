@@ -25,7 +25,7 @@ interface ClimateAnalysisProps {
 export const ClimateAnalysis: React.FC<ClimateAnalysisProps> = ({ cities, selectedCity }) => {
   const [cityId, setCityId] = useState<number>(selectedCity?.id || 1);
   const [variable, setVariable] = useState<string>('temperature');
-  const [rangeDays, setRangeDays] = useState<number>(30);
+  const [rangeDays, setRangeDays] = useState<number>(7);
   const [historyData, setHistoryData] = useState<HistoryResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,9 +95,21 @@ export const ClimateAnalysis: React.FC<ClimateAnalysisProps> = ({ cities, select
             <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
               Análisis Climático e Historial del Perú
             </h3>
+            {historyData?.data_source === 'real' && (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold border bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">
+                Datos Reales
+              </span>
+            )}
+            {historyData?.data_source === 'simulado' && (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold border bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30">
+                Datos Simulados
+              </span>
+            )}
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Estudio estadístico y series temporales climatológicas con registros diarios.
+            {historyData?.data_source === 'real'
+              ? `Serie con registros reales del dataset nacional (${historyData?.stats.days_analyzed} días cargados).`
+              : 'Estudio estadístico y series temporales climatológicas con registros diarios.'}
           </p>
         </div>
 

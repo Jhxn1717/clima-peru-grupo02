@@ -75,6 +75,12 @@ export const CityComparison: React.FC<CityComparisonProps> = ({ cities }) => {
           <p className="text-xs text-slate-500 dark:text-slate-400">
             Selecciona de 2 a 4 ciudades peruanas para contrastar temperaturas, humedad, radiación UV y lluvias.
           </p>
+          {comparisonData?.cities.some((c) => c.data_source === 'real') && (
+            <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-1">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400" />
+              Algunas ciudades usan registros reales del dataset nacional.
+            </div>
+          )}
         </div>
 
         {/* City Selector Buttons */}
@@ -145,6 +151,16 @@ export const CityComparison: React.FC<CityComparisonProps> = ({ cities }) => {
                   }`}>
                     {city.region_natural}
                   </span>
+                  {city.data_source === 'real' && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">
+                      Reales
+                    </span>
+                  )}
+                  {city.data_source === 'simulado' && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30">
+                      Simulado
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400">{city.department_name}</p>
                 <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">

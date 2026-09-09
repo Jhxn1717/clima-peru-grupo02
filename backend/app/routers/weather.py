@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 from app.database import get_db
 from app.models.peru_geo import City
+from app.models.weather_record import WeatherRecord
 from app.services.weather_service import WeatherService
 from app.schemas.weather import CurrentWeather, FullForecastResponse, HourlyForecastItem, DailyForecastItem, DepartmentWeatherSummary
 
@@ -64,3 +65,41 @@ async def get_weather_overview(db: Session = Depends(get_db)):
         return summaries
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error cargando resumen nacional: {str(e)}")
+
+@router.get("/dataset")
+async def get_real_dataset(
+    limit: int = Query(10000, ge=1, le=100000, description="Cantidad máxima de registros a devolver"),
+    db: Session = Depends(get_db)
+):
+    """Devuelve los registros reales del dataset CSV guardados en weather_records."""
+    try:
+        records = (
+            db.query(WeatherRecord, City)
+            .join(City, City.id == WeatherRecord.city_id)
+            .filter(WeatherRecord.source == "csv")
+            .order_by(WeatherRecord.record_date.asc(), WeatherRecord.hour.asc(), City.name.asc())
+            .limit(limit)
+            .all()
+        )
+        rows = [
+            {
+                "id": rec.id,
+                "city_name": city.name,
+                "department_name": city.department.name if city.department else "",
+                "record_date": rec.record_date.isoformat(),
+                "hour": rec.hour,
+                "temperature": rec.temperature,
+                "temp_min": rec.temp_min,
+                "temp_max": rec.temp_max,
+                "humidity": rec.humidity,
+                "precipitation": rec.precipitation,
+                "wind_speed": rec.wind_speed,
+                "uv_index": rec.uv_index,
+                "condition": rec.condition,
+                "source": rec.source,
+            }
+            for rec, city in records
+        ]
+        return {"count": len(rows), "records": rows}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error leyendo el dataset real: {str(e)}")

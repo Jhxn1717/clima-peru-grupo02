@@ -19,6 +19,7 @@ class CityComparisonItem(BaseModel):
     weather_description: str
     weather_icon: str
     surface_pressure: float
+    data_source: str = "simulado"
 
 class CompareResponse(BaseModel):
     count: int

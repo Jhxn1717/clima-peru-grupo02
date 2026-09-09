@@ -23,11 +23,17 @@ import {
 import { weatherApi } from '../services/api';
 import { adminApi } from '../services/adminApi';
 import { authStorage } from '../services/authApi';
+import { saveCsvPreview, loadCsvPreview, clearCsvPreview } from '../utils/csvStorage';
 
 const CHUNK_SIZE = 3000;
 const MAX_CHART_POINTS = 500;
 const MAX_RENDERED = 1000;
 const LARGE_FILE_SIZE = 1024 * 1024;
+
+// Extremos iterativos (sin spread) para tolerar datasets de 100k+ filas sin
+// desbordar la pila (Math.max(...arr) revienta con arrays muy grandes).
+const maxOf = (arr: number[]) => (arr.length ? arr.reduce((a, b) => (b > a ? b : a), -Infinity) : 0);
+const minOf = (arr: number[]) => (arr.length ? arr.reduce((a, b) => (b < a ? b : a), Infinity) : 0);
 
 // Caché de módulo: sobrevive al desmontaje de la pestaña para que el dataset
 // importado (y su archivo) no se pierdan al cambiar de pestaña.
@@ -61,8 +67,27 @@ export const CsvImporter: React.FC<CsvImporterProps> = ({ theme = 'dark', onData
   const [isSavingDataset, setIsSavingDataset] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(csvSession.saveStatus);
   const [saveHasError, setSaveHasError] = useState<boolean>(csvSession.saveHasError);
+  const [restoredFromDb, setRestoredFromDb] = useState(false);
+  const [isLoadingDb, setIsLoadingDb] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isAdmin = authStorage.getUser()?.role === 'admin';
+
+  // Recupera la vista previa del último CSV cargado (persistida en IndexedDB)
+  // cuando no hay un dataset vivo en la memoria de la pestaña actual.
+  useEffect(() => {
+    if (csvSession.importResult) return;
+    let cancelled = false;
+    loadCsvPreview().then((stored) => {
+      if (stored && !cancelled) {
+        setImportResult(stored);
+        setRestoredFromDb(true);
+        setChartMode(stored.data?.length > 60 ? 'sampled' : 'all');
+        setCurrentPage(1);
+        setSaveStatus('Vista previa recuperada del último dataset cargado en este navegador (persiste aunque cierres sesión o recargues).');
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   // Sincroniza la caché de módulo en cada cambio de estado
   useEffect(() => {
@@ -95,6 +120,86 @@ export const CsvImporter: React.FC<CsvImporterProps> = ({ theme = 'dark', onData
       setSaveHasError(true);
     } finally {
       setIsSavingDataset(false);
+    }
+  };
+
+  // Carga de respaldo: trae los registros reales guardados en Supabase (weather_records)
+  const loadFromDatabase = async () => {
+    setIsLoadingDb(true);
+    setError(null);
+    try {
+      const { records } = await weatherApi.getRealDataset(10000);
+      if (!records.length) {
+        setSaveHasError(true);
+        setSaveStatus('Todavía no hay datos reales guardados en la base de datos. Sube un CSV y pulsa «Guardar en Base de Datos Real».');
+        return;
+      }
+
+      const data = records.map((r: any, idx: number) => ({
+        id: idx + 1,
+        date: r.record_date,
+        city: r.city_name,
+        department: r.department_name,
+        temperature: r.temperature,
+        temp_min: r.temp_min,
+        temp_max: r.temp_max,
+        humidity: r.humidity,
+        precipitation: r.precipitation ?? 0,
+        wind_speed: r.wind_speed,
+        uv_index: r.uv_index,
+        condition: r.condition || 'Dato Registrado'
+      }));
+
+      const avg = (arr: number[]) =>
+        arr.length ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : 0;
+      const temps = data.map((d: any) => d.temperature ?? 0);
+      const precips = data.map((d: any) => d.precipitation);
+      const winds = data.map((d: any) => d.wind_speed ?? 0);
+      const uvs = data.map((d: any) => d.uv_index ?? 0);
+
+      const result = {
+        success: true,
+        message: `Dataset real cargado desde la base de datos: ${records.length} registros guardados (source=csv).`,
+        source_db: true,
+        stats: {
+          total_records: records.length,
+          filename: 'weather_records (base de datos real)',
+          detected_city: `${data[0]?.city || 'Perú'} (${data[0]?.department || ''})`,
+          all_cities: Array.from(new Set(data.map((d: any) => d.city))),
+          start_date: data[0]?.date,
+          end_date: data[data.length - 1]?.date,
+          temperature: {
+            average: avg(temps),
+            max: maxOf(temps),
+            min: minOf(temps)
+          },
+          precipitation: {
+            total: Math.round(precips.reduce((a, b) => a + b, 0) * 10) / 10,
+            max_single_day: maxOf(precips),
+            rainy_days: precips.filter((p: number) => p > 0.1).length
+          },
+          wind: {
+            average: avg(winds),
+            max: maxOf(winds)
+          },
+          uv: {
+            average: avg(uvs),
+            max: maxOf(uvs)
+          }
+        },
+        data
+      };
+      setImportResult(result);
+      setChartMode(data.length > 60 ? 'sampled' : 'all');
+      setCurrentPage(1);
+      setRestoredFromDb(true);
+      setSaveHasError(false);
+      setSaveStatus('Visualización generada desde los datos reales guardados en la base de datos.');
+    } catch (err: any) {
+      setSaveHasError(true);
+      setSaveStatus(`Error: ${err.message || 'No se pudo consultar el dataset real guardado.'}`);
+    } finally {
+      setIsLoadingDb(false);
     }
   };
 
@@ -154,7 +259,7 @@ export const CsvImporter: React.FC<CsvImporterProps> = ({ theme = 'dark', onData
     const winds = rows.map(r => r.wind_speed);
     const uvs = rows.map(r => r.uv_index);
 
-    setImportResult({
+    const demoResult = {
       success: true,
       message: `Dataset de demostración cargado con éxito (${demoName})`,
       stats: {
@@ -166,28 +271,31 @@ export const CsvImporter: React.FC<CsvImporterProps> = ({ theme = 'dark', onData
         end_date: rows[rows.length - 1].date,
         temperature: {
           average: Math.round((temps.reduce((a, b) => a + b, 0) / temps.length) * 10) / 10,
-          max: Math.max(...rows.map(r => r.temp_max)),
-          min: Math.min(...rows.map(r => r.temp_min))
+          max: maxOf(rows.map(r => r.temp_max)),
+          min: minOf(rows.map(r => r.temp_min))
         },
         precipitation: {
           total: Math.round(precips.reduce((a, b) => a + b, 0) * 10) / 10,
-          max_single_day: Math.max(...precips),
+          max_single_day: maxOf(precips),
           rainy_days: precips.filter(p => p > 0.1).length
         },
         wind: {
           average: Math.round((winds.reduce((a, b) => a + b, 0) / winds.length) * 10) / 10,
-          max: Math.max(...winds)
+          max: maxOf(winds)
         },
         uv: {
           average: Math.round((uvs.reduce((a, b) => a + b, 0) / uvs.length) * 10) / 10,
-          max: Math.max(...uvs)
+          max: maxOf(uvs)
         }
       },
       data: rows
-    });
+    };
+    setImportResult(demoResult);
+    saveCsvPreview(demoResult);
     setChartMode('all');
     setError(null);
     setCurrentPage(1);
+    setRestoredFromDb(false);
   };
 
   // Parser local completo que lee el 100% de todas las filas del archivo
@@ -318,34 +426,37 @@ export const CsvImporter: React.FC<CsvImporterProps> = ({ theme = 'dark', onData
       end_date: dates[dates.length - 1] || '-',
       temperature: {
         average: avg(temps),
-        max: temps.length ? Math.max(...temps) : 0,
-        min: temps.length ? Math.min(...temps) : 0
+        max: maxOf(temps),
+        min: minOf(temps)
       },
       precipitation: {
         total: Math.round(precips.reduce((a, b) => a + b, 0) * 10) / 10,
-        max_single_day: precips.length ? Math.max(...precips) : 0,
+        max_single_day: maxOf(precips),
         rainy_days: precips.filter(p => p > 0.1).length
       },
       wind: {
         average: avg(winds),
-        max: winds.length ? Math.max(...winds) : 0
+        max: maxOf(winds)
       },
       uv: {
         average: avg(uvs),
-        max: uvs.length ? Math.max(...uvs) : 0
+        max: maxOf(uvs)
       }
     };
 
     const useServerStats = serverStats && serverStats.total_records === data.length;
 
-    setImportResult({
+    const result = {
       success: true,
       message: serverMessage || `Archivo procesado con éxito: ${data.length} registros cargados al 100% (${filename})`,
       stats: useServerStats ? serverStats : localStats,
       data
-    });
+    };
+    setImportResult(result);
+    saveCsvPreview(result);
     setChartMode(data.length > 60 ? 'sampled' : 'all');
     setError(null);
+    setRestoredFromDb(false);
   };
 
   // Manejo de carga de archivo
@@ -535,6 +646,19 @@ export const CsvImporter: React.FC<CsvImporterProps> = ({ theme = 'dark', onData
           >
             🌿 Demo Iquitos (Selva)
           </button>
+          <button
+            onClick={loadFromDatabase}
+            disabled={isLoadingDb}
+            className={`px-3 py-1 rounded-xl font-medium transition-all shadow-sm flex items-center gap-1.5 ${
+              isLoadingDb
+                ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed border border-slate-200 dark:border-slate-700'
+                : 'bg-sky-500/10 hover:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-500/30'
+            }`}
+            title="Genera la visualización desde los registros reales guardados en la base de datos"
+          >
+            <Database className="w-3.5 h-3.5" />
+            <span>{isLoadingDb ? 'Consultando BD real...' : 'Ver datos reales guardados'}</span>
+          </button>
         </div>
       </div>
 
@@ -583,6 +707,8 @@ export const CsvImporter: React.FC<CsvImporterProps> = ({ theme = 'dark', onData
                   setError(null);
                   setSaveStatus(null);
                   setSaveHasError(false);
+                  setRestoredFromDb(false);
+                  clearCsvPreview();
                 }}
                 className="flex items-center gap-1 text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 font-medium transition-colors"
               >
